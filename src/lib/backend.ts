@@ -4,8 +4,8 @@ import { useSyncExternalStore } from 'react'
 
 // 실제 서버 주소.
 // - Vite 개발 서버(vite.config.ts)와 Vercel(vercel.json)은 같은 출처의 /gw-api 를 이 주소로 프록시한다
-// - GitHub Pages 는 정적 호스팅이라 프록시가 없다 (/gw-api → 404). 대신 서버 CORS 가 https://jyx-07.github.io 를
-//   허용하므로(gridwitness-api app/main.py) 서버 주소로 바로 요청한다
+// - GitHub Pages 는 정적 호스팅이라 프록시가 없다 (/gw-api → 404). 현재 ParksKin Pages 출처는 API CORS에
+//   등록되어 있으므로 서버 주소로 바로 요청한다.
 export const UPSTREAM_API = 'https://gridwitness-api.https.gsmsv.site'
 const PROXY_API = '/gw-api'
 /** 프록시가 없는 정적 호스팅(GitHub Pages)에서 열렸는지 */
@@ -126,6 +126,13 @@ export interface Capabilities {
   models: ModelCapability[]
   assistant: { configured: boolean; model: string | null; available?: boolean | null; timeout_seconds?: number }
   auth: { required: boolean }
+}
+/** The API's available flag only verifies that the configured model appears in Ollama's model list. */
+export function assistantStatusLabel(assistant: Capabilities['assistant']): string {
+  if (!assistant.configured) return 'LLM 미설정 · 서버 규칙으로 답변'
+  if (assistant.available === false) return '설정 모델을 서버에서 확인하지 못함 · 서버 규칙으로 대체'
+  if (assistant.available === true) return '설정 모델 목록 확인됨 · 실제 답변 채택 여부는 대화 결과에서 확인'
+  return 'LLM 설정됨 · 모델 목록 확인 중'
 }
 export interface CapabilityState { state: 'idle' | 'checking' | 'ok' | 'down'; data: Capabilities | null; detail: string; checkedAt: number | null }
 let capabilities: CapabilityState = { state: 'idle', data: null, detail: '', checkedAt: null }

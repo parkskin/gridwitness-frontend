@@ -1,4 +1,4 @@
-// 기획서 4.1 / 4.3 기준 도메인 타입. FastAPI 응답 스키마(Pydantic)와 1:1로 맞출 예정.
+// 프론트엔드 도메인 타입. API 응답 스키마와의 변환은 src/api/backend.ts에서 처리한다.
 
 export const CHANNELS = ['Ia', 'Ib', 'Ic', 'In', 'Va', 'Vb', 'Vc'] as const
 export const RU_CHANNELS = ['Ia', 'Ic', 'Va', 'Vb', 'Vc'] as const

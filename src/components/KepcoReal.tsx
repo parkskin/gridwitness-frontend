@@ -1,19 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useMedia } from '../lib/useMedia'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { apiBase } from '../lib/backend'
 import { CHART } from '../lib/chart'
 import { ErrorState, Section } from './ui'
+import { getKepcoUsagePage } from '../api/kepcoUsage'
 
 // 서버가 프록시하는 한전 공공데이터(15069679, 월별 판매량). 화면에서 직접 모아 보여주며, 값은 가공하지 않고 합산만 한다.
 
-interface Rec {
-  period: string
-  region: string
-  district: string
-  contract_type: string
-  sales_amount: string
-}
 interface Loaded {
   rows: { period: string; region: string; district: string; contract: string; value: number }[]
   total: number
@@ -25,18 +18,9 @@ const compact = (s: string) => s.replace(/\s+/g, '')
 const fmt = (n: number) => Math.round(n).toLocaleString()
 
 async function fetchAll(): Promise<Loaded> {
-  const url = (p: number) => `${apiBase()}/api/v1/energy/kepco/usage?page=${p}&per_page=${PER_PAGE}`
-  const first = await fetch(url(1))
-  if (!first.ok) throw new Error(`서버 오류 (${first.status})`)
-  const head = (await first.json()) as { total_count: number; records: Rec[] }
+  const head = await getKepcoUsagePage(1, PER_PAGE)
   const pages = Math.ceil(head.total_count / PER_PAGE)
-  const rest = await Promise.all(
-    Array.from({ length: pages - 1 }, async (_, k) => {
-      const r = await fetch(url(k + 2))
-      if (!r.ok) throw new Error(`서버 오류 (${r.status})`)
-      return ((await r.json()) as { records: Rec[] }).records
-    }),
-  )
+  const rest = await Promise.all(Array.from({ length: pages - 1 }, async (_, k) => (await getKepcoUsagePage(k + 2, PER_PAGE)).records))
   const all = [...head.records, ...rest.flat()]
   // 값이 빈 줄은 원본에 있는 빈 행이라 제외하고 개수만 알려준다
   const valid = all.filter((r) => r.period && r.sales_amount !== '' && Number.isFinite(Number(r.sales_amount.replace(/,/g, ''))))

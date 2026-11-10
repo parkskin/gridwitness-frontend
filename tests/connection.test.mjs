@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import * as backend from '../src/lib/backend.ts'
+import { getKepcoUsagePage } from '../src/api/kepcoUsage.ts'
 import { openSerial, parseFrame } from '../src/lib/serial.ts'
 
 test('serial non-finite sensor data is rejected instead of converted to a real zero', () => {
@@ -37,6 +38,26 @@ test('API request timeout aborts a transport and reports a finite wait', async (
     init.signal.addEventListener('abort', () => reject(init.signal.reason ?? new DOMException('Aborted','AbortError')), {once:true})
   })
   await assert.rejects(backend.apiRequest('/api/v1/capabilities', {}, 10), /시간|응답|초/)
+})
+
+test('LLM availability is described as an endpoint probe, not proof of a usable answer', () => {
+  assert.equal(backend.assistantStatusLabel({ configured: false, model: null }), 'LLM 미설정 · 서버 규칙으로 답변')
+  assert.equal(backend.assistantStatusLabel({ configured: true, model: 'qwen2.5:3b', available: false }), '설정 모델을 서버에서 확인하지 못함 · 서버 규칙으로 대체')
+  assert.equal(backend.assistantStatusLabel({ configured: true, model: 'qwen2.5:3b', available: true }), '설정 모델 목록 확인됨 · 실제 답변 채택 여부는 대화 결과에서 확인')
+  assert.equal(backend.assistantStatusLabel({ configured: true, model: 'qwen2.5:3b', available: null }), 'LLM 설정됨 · 모델 목록 확인 중')
+})
+
+test('KEPCO usage requests use the shared API base and include the configured access token', async () => {
+  backend.setApiToken('kepco-token')
+  let request
+  globalThis.fetch = async (url, init) => {
+    request = { url, authorization: new Headers(init.headers).get('authorization') }
+    return Response.json({ total_count: 1, records: [] })
+  }
+  assert.deepEqual(await getKepcoUsagePage(2), { total_count: 1, records: [] })
+  assert.match(request.url, /api\/v1\/energy\/kepco\/usage\?page=2&per_page=1000$/)
+  assert.equal(request.authorization, 'Bearer kepco-token')
+  backend.setApiToken('')
 })
 
 test('closing a serial connection releases both native stream locks before closing the port', async () => {

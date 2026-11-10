@@ -52,6 +52,8 @@ Chrome/Edge에서 우노를 연결할 수 있습니다. 처음에는 실측 장�
 
 LLM은 API 서버의 `GW_ASSISTANT_LLM_URL`, `GW_ASSISTANT_MODEL`로 연결합니다. `GW_ASSISTANT_TIMEOUT_SECONDS`로 유한 응답 시간을 정합니다. 모델 준비 상태와 실제 채택 응답을 함께 확인해야 연결 검증이 완료됩니다.
 
+설정 화면의 LLM 상태는 서버 모델 목록에 설정 모델이 보이는지 확인한 결과입니다. 실제 답변 생성 성공을 뜻하지 않으며, 각 대화 응답의 `answer_mode`, `llm_model`, 대체 사유를 확인합니다.
+
 ## 저장과 서버
 
 기본 API는 `https://gridwitness-api.https.gsmsv.site`입니다. 개발 서버·Vercel은 `/gw-api`로 프록시하고 GitHub Pages는 API를 직접 호출합니다. 로컬 API를 쓰려면 Vite 시작 전 `GW_API_TARGET`을 설정하거나 설정 화면에서 주소를 바꿉니다. 하위 경로 빌드는 `VITE_BASE=/gridwitness-frontend/`를 사용합니다.
@@ -63,4 +65,4 @@ LLM은 API 서버의 `GW_ASSISTANT_LLM_URL`, `GW_ASSISTANT_MODEL`로 연결합�
 - 서버가 `GW_API_TOKEN`을 설정한 경우 설정 화면에서 접근 코드를 입력합니다. 미설정이면 공개 시연 모드이며 작업자 이름은 로그인 신원을 대신하지 않습니다.
 - 학교 서버 만료 예정일은 2026-11-20입니다. 운영 백업과 이전은 별도로 관리해야 합니다.
 
-UI 설명은 `docs/사용설명서.md`, 구현 설명은 `docs/로직-사용설명서.md`, 이번 수정·검증 계획은 `docs/superpowers/plans/2026-11-10-web-completion.md`를 참고합니다.
+UI 설명은 `docs/사용설명서.md`, 구현 설명은 `docs/로직-사용설명서.md`, 전체 점검 결과는 `docs/프로그램_전체점검_2026-11-10.md`를 참고합니다.

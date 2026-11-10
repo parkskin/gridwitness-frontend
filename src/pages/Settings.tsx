@@ -4,7 +4,7 @@ import ChannelMap from '../components/ChannelMap'
 import DevicePanel from '../components/DevicePanel'
 import { PageHeader } from '../components/ui'
 import { useActor } from '../lib/actor'
-import { apiBase, checkCapabilities, checkHealth, DEFAULT_API, getApiToken, setApiBase, setApiToken, useBackendHealth, useCapabilities } from '../lib/backend'
+import { apiBase, assistantStatusLabel, checkCapabilities, checkHealth, DEFAULT_API, getApiToken, setApiBase, setApiToken, useBackendHealth, useCapabilities } from '../lib/backend'
 import { AI_MODELS } from '../lib/models'
 import { NOMINAL_V, useVillage } from '../lib/village'
 
@@ -79,7 +79,7 @@ export default function Settings() {
           {capabilities.state === 'down' && <p className="text-bad" role="status">{capabilities.detail}</p>}
           {capabilities.data && <>
             <dl className="dl-rows">
-              <div><dt>현장 대화</dt><dd>{!capabilities.data.assistant.configured ? 'LLM 미설정 · 서버 규칙으로 답변' : capabilities.data.assistant.available === false ? 'LLM 연결 실패 · 서버 규칙으로 대체' : capabilities.data.assistant.available ? 'LLM 연결 확인됨' : 'LLM 설정됨 · 실제 응답 확인 필요'}</dd></div>
+              <div><dt>현장 대화</dt><dd>{assistantStatusLabel(capabilities.data.assistant)}</dd></div>
               <div><dt>대화 모델</dt><dd>{capabilities.data.assistant.model || '미설정'}</dd></div>
               {capabilities.data.models.map((m) => <div key={m.country}><dt>{m.country} 파형 모델</dt><dd>{m.available ? '사용 가능' : '연결 안 됨'} · {m.version || m.key || '버전 미확인'}<br /><span className="small muted">{m.rows}샘플 · {m.channels?.join(', ')} · {m.sampling_rate_hz}Hz · {m.labels?.join(' / ')}</span></dd></div>)}
               <div><dt>접근 권한</dt><dd>{capabilities.data.auth.required ? '접근 코드 필요' : '공개 시연 모드 · 로그인 신원 확인 없음'}</dd></div>

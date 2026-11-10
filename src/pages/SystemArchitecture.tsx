@@ -4,7 +4,8 @@ import { IconBrain, IconDatabase, IconPerson, IconPlug, IconWave } from '../comp
 import { PageHeader } from '../components/ui'
 import { useBackendHealth, useCapabilities } from '../lib/backend'
 import { EVENT_MODEL } from '../lib/villageEvents'
-import { SOURCE_LABEL, useVillage } from '../lib/village'
+import { useVillage } from '../lib/village'
+import { unoStatus } from '../lib/systemArchitectureStatus'
 
 type Live = 'ok' | 'warn' | 'down' | 'idle'
 interface Node {
@@ -26,6 +27,7 @@ export default function SystemArchitecture() {
   const snap = useVillage()
   const health = useBackendHealth()
   const caps = useCapabilities()
+  const uno = unoStatus(snap)
   const models = caps.data?.models ?? []
   const llm = caps.data?.assistant
   const apiLive: Node['live'] = health.state === 'ok' ? { state: 'ok', text: `DB 준비됨${caps.data?.auth.required ? ' · 접근 코드 필요' : ''}` } : health.state === 'down' ? { state: 'down', text: health.detail || '응답 없음' } : { state: 'idle', text: '확인 중' }
@@ -40,10 +42,18 @@ export default function SystemArchitecture() {
       key: 'in', title: '① 데이터 입력', icon: <IconPlug />,
       nodes: [
         {
-          id: 'uno', title: '마을 모형 (우노)', tech: 'Arduino Uno · INA219 ×2 · 릴레이 · USB 시리얼',
-          live: snap.connected ? { state: snap.source === 'SERIAL' ? 'ok' : 'warn', text: SOURCE_LABEL[snap.source] } : { state: 'down', text: '장치 연결 끊김' },
-          does: ['0.5초마다 전압·전류 측정 (주택 분기 0x40, 가로등 분기 0x41)', '전류가 급변하면 사건 파형을 녹화해 전송', '릴레이로 정전·복구 명령 수행'],
-          guard: '실측과 시뮬레이터를 화면 전체에서 구분해 표시',
+          id: 'uno', title: '마을 모형 (우노)', tech: 'Arduino Uno · 분기 센서 0x40/0x41 · 릴레이 · USB 시리얼',
+          live: { state: uno.state, text: uno.text },
+          does: [
+            snap.source === 'MOCK'
+              ? '시뮬레이터가 전체·분기 값을 계산 (실측 아님)'
+              : snap.connected && snap.zones
+                ? '주택 0x40·가로등 0x41 분기별 실측값 수신 중'
+                : '두 센서가 인식되면 주택·가로등 분기별 측정값 수신 (0.5초)',
+            '전류가 급변하면 사건 파형을 녹화해 전송',
+            '릴레이로 정전·복구 명령 수행',
+          ],
+          guard: `${uno.detail} · 실측과 시뮬레이터를 구분해 표시`,
           link: { to: '/village', label: '3D 마을' },
         },
         {

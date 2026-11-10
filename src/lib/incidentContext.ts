@@ -3,6 +3,7 @@
 // 교류 고장파형 사건(IncidentCase)만 다룬다. 마을 모형 DC 계측·한전 사용량 데이터는 섞지 않는다.
 
 import { featureLabel, REASON_SHORT } from './aiExplain'
+import { formatModelScore } from './modelScore'
 import { ANALYSIS_LABEL, SOURCE_LABEL, VERDICT_LABEL, type IncidentCase } from '../types'
 
 /** 이벤트 유형 코드의 뜻 (Xiong et al. 2020 공개 데이터셋 정의) */
@@ -61,8 +62,6 @@ export interface IncidentContext {
   builtAt: string
 }
 
-const pct = (v: number) => `${Math.round(v * 100)}%`
-
 export function buildIncidentContext(c: IncidentCase): IncidentContext {
   const a = c.analysis
   const ai = a?.ai
@@ -107,7 +106,7 @@ export function buildIncidentContext(c: IncidentCase): IncidentContext {
   if (an.status === 'NONE') add('analysis', 'analysis.status', '분석 실행', '아직 분석하지 않음')
   else {
     add('analysis', 'analysis.type', '분석 종류', an.type ?? '—')
-    add('analysis', 'analysis.status', 'AI 결과', an.status === 'COMPLETED' ? `${eventKo(an.label!)} · ${an.score != null ? pct(an.score) : '—'}` : '판단 보류')
+    add('analysis', 'analysis.status', 'AI 결과', an.status === 'COMPLETED' ? `${eventKo(an.label!)} · ${an.score != null ? `${formatModelScore(an.score)} (점수, 확률 아님)` : '—'}` : '판단 보류')
     if (an.ranking.length > 1) add('analysis', 'analysis.ranking', '유형별 점수', an.ranking.map((r) => `${r.label} ${r.score.toFixed(2)}`).join(' / '))
     an.reasons.forEach((r, k) => add('analysis', `analysis.reason.${k}`, '보류·주의 사유', r))
     an.topFeatures.forEach((f, k) => add('analysis', `analysis.feature.${k}`, '판단에 영향 준 특징', `${f.label} (${f.contribution >= 0 ? '+' : ''}${f.contribution.toFixed(3)})`))

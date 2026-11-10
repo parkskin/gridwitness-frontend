@@ -16,6 +16,8 @@ export default function Channels({ snap, selected, onSelect, controls }: { snap:
         const [label, tone]: [string, Tone] =
           snap.status === 'NO_DATA'
             ? ['데이터 없음', 'off']
+            : measured && snap.measurementScope === 'HOUSE' && def.kind === 'LAMP'
+              ? (led.channelOn ? ['시각화 (릴레이 ON)', 'off'] : ['꺼짐 (릴레이 OFF)', 'off'])
             : led.fault
               ? [FAULT_LABEL[led.fault], led.fault === 'OPEN' ? 'warn' : 'err']
               : !snap.relay
@@ -42,7 +44,7 @@ export default function Channels({ snap, selected, onSelect, controls }: { snap:
               </span>
             </div>
             <span className="small muted">{def.relay}</span>
-            <span className="small muted">{snap.zones ? ZONE_SENSOR[def.kind] : '구간값 없음 · 전체 계측'}</span>
+            <span className="small muted">{snap.source === 'MOCK' ? ZONE_SENSOR[def.kind] : snap.measurementScope === 'BOTH' ? ZONE_SENSOR[def.kind] : def.kind === 'HOUSE' && snap.measurementScope === 'HOUSE' ? '주택 분기 실측' : def.kind === 'LAMP' && snap.measurementScope === 'HOUSE' ? '전류 미측정 · 릴레이 시각화' : '구간 실측 없음'}</span>
             <Status tone={tone}>{pending ? '명령 전송 중…' : label}</Status>
             {controls && (
               <Switch

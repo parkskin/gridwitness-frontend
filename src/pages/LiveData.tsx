@@ -6,7 +6,7 @@ import EventList from '../components/EventList'
 import HardwareFlow from '../components/HardwareFlow'
 import { Badge, Metric, Metrics, NODE_TONE, Section, Status } from '../components/ui'
 import { CHART } from '../lib/chart'
-import { connectSerial, ledA, NOMINAL_V, STATUS_LABEL, switchToMock, THRESHOLDS, TICK_MS, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
+import { connectSerial, IOT_CHANNELS, ledA, NOMINAL_V, STATUS_LABEL, switchToMock, THRESHOLDS, TICK_MS, useVillage, ZONE_LABEL, ZONE_SENSOR, zoneChannels } from '../lib/village'
 
 /** 예전 주소(/live)는 FRTU 상세의 실시간 분석 탭으로 */
 export default function LiveData() {
@@ -14,13 +14,13 @@ export default function LiveData() {
 }
 
 /** 장치 값이 없을 때: 0과 빈 그래프 대신 연결 방법만 보여줌 */
-export function DeviceConnectCard({ real, reconnecting }: { real: boolean; reconnecting: boolean }) {
+export function DeviceConnectCard({ real, reconnecting, scopeUnknown = false }: { real: boolean; reconnecting: boolean; scopeUnknown?: boolean }) {
   const [busy, setBusy] = useState(false)
   return (
     <div className="live-empty">
       <div>
-        <strong>{real ? (reconnecting ? '장치를 다시 찾는 중이에요' : '장치에서 측정값을 받지 못하고 있어요') : '시뮬레이터 통신이 끊긴 상태예요'}</strong>
-        <p>{real ? 'USB 케이블과 Arduino 전원을 확인하고 다시 연결하세요. 모형 없이 화면만 보려면 시뮬레이터를 쓰면 돼요.' : '마을 화면 제어판의 고장 시뮬레이션에서 전체 복구를 누르세요.'}</p>
+          <strong>{real ? reconnecting ? '장치를 다시 찾는 중이에요' : scopeUnknown ? '센서 측정 범위를 확인하지 못했어요' : '장치에서 측정값을 받지 못하고 있어요' : '시뮬레이터 통신이 끊긴 상태예요'}</strong>
+          <p>{real ? scopeUnknown ? 'UNO의 INA219 주소 안내가 필요합니다. 최신 GridWitness 스케치를 올리고 다시 연결하세요. 범위가 확인될 때까지 분석과 사건 저장을 보류합니다.' : 'USB 케이블과 Arduino 전원을 확인하고 다시 연결하세요. 모형 없이 화면만 보려면 시뮬레이터를 쓰면 돼요.' : '마을 화면 제어판의 고장 시뮬레이션에서 전체 복구를 누르세요.'}</p>
       </div>
       {real && (
         <div className="live-empty-actions">
@@ -54,6 +54,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
   const noData = snap.status === 'NO_DATA'
   const real = snap.source === 'SERIAL'
   const onCount = Object.values(snap.channels).filter(Boolean).length
+  const measuredOnCount = real && snap.measurementScope === 'HOUSE' ? IOT_CHANNELS.filter((c) => c.kind === 'HOUSE' && snap.channels[c.id]).length : onCount
   const lowV = snap.relay && snap.v < THRESHOLDS.vMin && !noData
 
   // 점수가 나온 이유: 전류 차이와 전압 강하 중 큰 쪽이 점수가 된다 (lib/village.ts anomalyScore와 같은 식)
@@ -76,7 +77,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
   if (noData)
     return (
       <div className="live">
-        <DeviceConnectCard real={real} reconnecting={snap.reconnecting} />
+        <DeviceConnectCard real={real} reconnecting={snap.reconnecting} scopeUnknown={real && snap.connected && snap.measurementScope === 'UNKNOWN'} />
         {!compact && <HardwareFlow />}
       </div>
     )
@@ -85,7 +86,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
     <div className="live">
       <div className="live-meta">
         <Badge tone={real ? 'accent' : 'neutral'}>{real ? '실측 장치' : '시뮬레이터'}</Badge>
-        <span className="small muted">켜 둔 LED 조합의 정상 전류와 실제 전류를 비교해 이상 점수를 내요 · 최근 {seconds}초</span>
+        <span className="small muted">{real && snap.measurementScope === 'HOUSE' ? '주택 분기 실측과 주택 채널 기준을 비교합니다 · 가로등은 릴레이 상태만 표시하며 분석·전류 기록에서 제외' : '켜 둔 LED 조합의 정상 전류와 실제 전류를 비교해 이상 점수를 내요'} · 최근 {seconds}초</span>
       </div>
 
       <Metrics cols={compact ? 2 : 4}>
@@ -95,7 +96,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
           foot={<>이상 점수 <b className="num" style={{ color: scoreColor(snap.score) }}>{snap.score.toFixed(2)}</b> · 주의 ≥ {THRESHOLDS.warn} · 이상 ≥ {THRESHOLDS.fault}</>}
         />
         <Metric
-          label="전류"
+          label={real && snap.measurementScope === 'HOUSE' ? '주택 분기 실측 전류' : '전류'}
           value={snap.i.toFixed(3)}
           unit={`A / 예상 ${snap.expected.toFixed(3)}`}
           foot={<span className={Math.abs(residual) > unit * 0.6 ? 'bad' : ''}>차이 {residual >= 0 ? '+' : ''}{residual.toFixed(3)} A · LED {ledUnits >= 0 ? '+' : ''}{ledUnits.toFixed(1)}개 분량</span>}
@@ -106,7 +107,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
           unit="V"
           foot={<span className={lowV ? 'bad' : ''}>{lowV ? `하한 ${THRESHOLDS.vMin.toFixed(2)} V보다 낮음` : `하한 ${THRESHOLDS.vMin.toFixed(2)} V · 정격 ${NOMINAL_V} V`}</span>}
         />
-        <Metric label="켜진 LED" value={snap.estLit} unit="/ 5 (추정)" foot={`채널 ${onCount}개 켜짐 · ${snap.p.toFixed(2)} W`} />
+        <Metric label="켜진 LED" value={snap.estLit} unit={real && snap.measurementScope === 'HOUSE' ? '/ 3 (주택 추정)' : '/ 5 (추정)'} foot={`릴레이 채널 ${onCount}개 켜짐 · ${snap.p.toFixed(2)} W${real && snap.measurementScope === 'HOUSE' ? ' · 전력은 주택 센서값 기준' : ''}`} />
       </Metrics>
 
       {!compact && <div className="section">
@@ -120,7 +121,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
       </div>}
 
       <div className={compact ? 'stack section' : 'grid-2 section'}>
-        <Section title="예상 대비 실제 전류" description={snap.zones ? '마을 전체 합계' : '마을 전체 (INA219)'}>
+        <Section title="예상 대비 실제 전류" description={real && snap.measurementScope === 'HOUSE' ? '주택 분기 실측 · 가로등 전류 미포함' : snap.zones && snap.measurementScope === 'BOTH' ? '마을 전체 합계' : '확인된 INA219 계측값'}>
           <div className="legend" style={{ marginBottom: 8 }}>
             <span><i style={{ background: CHART.ink }} />실제</span>
             <span style={{ color: CHART.secondary }}><i className="dash" />예상</span>
@@ -191,10 +192,11 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
       <Section title="판정 근거" description="장치와 구간별 측정 상태입니다.">
         <dl className="dl-rows">
           <div><dt>릴레이</dt><dd>{snap.relay ? '닫힘 — 마을에 전원 공급' : '열림 — 마을 전체 차단'}</dd></div>
-          <div><dt>예상 전류</dt><dd className="num">{snap.expected.toFixed(3)} A <span className="muted">(켜진 채널 {onCount}개 × {unit.toFixed(3)} A)</span></dd></div>
+          <div><dt>예상 전류</dt><dd className="num">{snap.expected.toFixed(3)} A <span className="muted">({real && snap.measurementScope === 'HOUSE' ? '주택에서 켜진' : '켜진'} 채널 {measuredOnCount}개 × {unit.toFixed(3)} A)</span></dd></div>
           {snap.zones &&
             (['HOUSE', 'LAMP'] as const).map((k) => {
               const z = snap.zones![k]
+              if (!z) return null
               const d = z.i - z.expected
               return (
                 <div key={k}>
@@ -205,7 +207,7 @@ export function LiveAnalysis({ compact = false }: { compact?: boolean }) {
                 </div>
               )
             })}
-          {!snap.zones && real && <div><dt>센서</dt><dd>INA219 하나로 마을 전체를 잽니다. 어느 구간·LED인지는 <Link to="/village/loads">채널 점검</Link>으로 확인하세요.</dd></div>}
+          {!snap.zones && real && <div><dt>센서 범위</dt><dd>{snap.measurementScope === 'HOUSE' ? '주택 분기 실측만 분석합니다. 가로등은 전류 미측정이며 릴레이 상태만 표시합니다.' : snap.measurementScope === 'LAMP' ? '가로등 분기 실측만 분석합니다.' : '센서 주소를 확인할 수 없어 분기 판정을 보류합니다.'} <Link to="/village/loads">채널 점검</Link></dd></div>}
         </dl>
       </Section>
 

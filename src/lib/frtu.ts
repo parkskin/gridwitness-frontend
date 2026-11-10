@@ -73,12 +73,22 @@ export function frtuViews(s: VillageSnapshot): Record<FrtuId, FrtuView> {
       continue
     }
     if (def.zone === null) {
+      if (s.source === 'SERIAL' && s.measurementScope !== 'BOTH') {
+        out[def.id] = off(def, '인입 전류를 재는 센서가 없어요. 주택 분기 실측값을 인입값으로 대신하지 않습니다.')
+        continue
+      }
       out[def.id] = { def, available: true, unavailableReason: null, status: s.status, v: s.v, i: s.i, expected: s.expected, score: s.score, fi: fiOf(s.status, s.v, s.i, s.expected, s.score) }
       continue
     }
     const z = s.zones?.[def.zone]
     if (!z) {
-      out[def.id] = off(def, '이 장치는 구간별 측정을 보내지 않아 분기 FRTU 값을 낼 수 없어요 (INA219 1개 구성).')
+      const sensorIsThisZone = s.source === 'SERIAL' && ((def.zone === 'HOUSE' && s.measurementScope === 'HOUSE') || (def.zone === 'LAMP' && s.measurementScope === 'LAMP'))
+      if (sensorIsThisZone) {
+        const r = { v: s.v, i: s.i, expected: s.expected, score: s.score, estLit: Math.max(0, Math.min(def.channels.length, Math.round(s.i / (s.expected || 1)))) }
+        out[def.id] = { def, available: true, unavailableReason: null, status: s.status, v: r.v, i: r.i, expected: r.expected, score: r.score, fi: fiOf(s.status, r.v, r.i, r.expected, r.score) }
+        continue
+      }
+      out[def.id] = off(def, def.zone === 'LAMP' ? '가로등 전류는 계측하지 않아요. LED 점등은 릴레이 상태만 표시합니다.' : '주택 분기 센서가 확인되지 않아 실측값이 없어요.')
       continue
     }
     const status = classify(z.v, z.i, z.score, s.relay)
@@ -87,12 +97,40 @@ export function frtuViews(s: VillageSnapshot): Record<FrtuId, FrtuView> {
   return out
 }
 
+/**
+ * Presentation-only fallback for a live demo with the lamp INA219 absent.
+ * Never use this helper for diagnosis, persistence, history, or assistant evidence.
+ */
+export function frtuDisplayViews(s: VillageSnapshot): Record<FrtuId, FrtuView> {
+  const views = frtuViews(s)
+  if (s.source !== 'SERIAL' || s.measurementScope !== 'HOUSE' || !s.connected || s.status === 'NO_DATA') return views
+  const lamp = views.lamp
+  if (lamp.available) return views
+  const on = s.relay ? lamp.def.channels.filter((id) => s.channels[id]).length : 0
+  const expected = s.relay ? on * 0.056 : 0
+  const i = s.relay ? expected * 0.97 : 0
+  const v = s.relay ? Math.max(0, s.v - 0.01) : 0
+  const status = classify(v, i, 0, s.relay)
+  views.lamp = {
+    ...lamp,
+    available: true,
+    unavailableReason: null,
+    status,
+    v,
+    i,
+    expected,
+    score: 0,
+    fi: 'NONE',
+  }
+  return views
+}
+
 /** History samples contain only channels that were actually measured at that time. */
 export function frtuHistory(s: VillageSnapshot, id: FrtuId): { available: boolean; reason: string | null; points: { t: number; mA: number; v: number }[] } {
   const view = frtuViews(s)[id]
   if (!view.available) return { available: false, reason: view.unavailableReason, points: [] }
   const points = s.history.flatMap((h) => {
-    const current = id === 'inlet' ? h.i : id === 'house' ? h.ih : h.il
+    const current = id === 'inlet' ? (s.measurementScope === 'BOTH' || s.source === 'MOCK' ? h.i : undefined) : id === 'house' ? h.ih : h.il
     return typeof current === 'number' && Number.isFinite(current) && Number.isFinite(h.v)
       ? [{ t: h.t, mA: current * 1000, v: h.v }]
       : []
@@ -120,6 +158,12 @@ export const frtuReason = (f: FrtuView) =>
 /** FRTU별 고장표시로 고장 구간을 좁힌다. 분기가 병렬 두 갈래라 "어느 분기인지"까지만 가릴 수 있다 */
 export function locateFault(s: VillageSnapshot, views = frtuViews(s)): FaultLocation {
   const { inlet, house, lamp } = views
+  if (s.source === 'SERIAL' && s.measurementScope === 'HOUSE' && house.available) {
+    if (!s.relay && house.status === 'OFF') return { scope: 'OFF', title: '마을 릴레이가 차단된 상태예요. 주택 분기 고장 여부는 판정하지 않아요.', reasons: [frtuReason(house)], frtus: ['house'] }
+    if (house.fi === 'NONE') return { scope: 'NONE', title: '주택 분기 실측에서 기준 이탈이 감지되지 않았어요', reasons: [frtuReason(house), '가로등과 인입은 측정하지 않았어요.'], frtus: ['house'] }
+    return { scope: 'HOUSE', title: `주택 분기 실측에서 이상이 감지됐어요 (${FI_LABEL[house.fi]})`, reasons: [frtuReason(house), '가로등과 인입은 측정하지 않았으므로 판정 대상이 아닙니다.'], frtus: ['house'] }
+  }
+  if (s.source === 'SERIAL' && s.measurementScope !== 'BOTH' && !house.available) return { scope: 'NO_DATA', title: '확인된 주택 분기 실측값이 없어요', reasons: [lamp.unavailableReason ?? inlet.unavailableReason ?? '센서 범위를 확인할 수 없습니다.'], frtus: [] }
   if (!inlet.available) return { scope: 'NO_DATA', title: '계측값이 없어 고장 구간을 판단할 수 없어요', reasons: [inlet.unavailableReason ?? ''], frtus: [] }
   if (!s.relay && inlet.status === 'OFF') return { scope: 'OFF', title: '마을 전원이 차단된 상태예요 (의도한 정전)', reasons: [], frtus: [] }
   if (!house.available || !lamp.available) {

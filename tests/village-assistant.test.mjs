@@ -26,8 +26,20 @@ test('disconnected devices and legacy events without source keep their provenanc
   const snapshot = { ...getVillage(), source: 'SERIAL', connected: false, status: 'NO_DATA', lastPacketAt: null }
   const event = { e: { ev: 2, receivedAt: '2026-11-10T00:00:00Z', src: 'auto', cmd: '', i100: Array(260).fill(1000), ch: [] }, verdict: { kind: 'NO_MODEL', reasons: [] } }
   const evidence = buildVillageEvidence(snapshot, [event], Date.now())
-  assert.equal(evidence.find((e) => e.id === 'village.status').value, '계측 데이터 없음')
+  assert.match(evidence.find((e) => e.id === 'village.status').value, /연결 끊김/)
   assert.match(evidence.find((e) => e.id === 'village.event.latest.summary').value, /출처 미기록/)
+})
+
+test('disconnected UNO and unknown sensor scope never expose the last sample as current LLM evidence', () => {
+  const base = getVillage()
+  const disconnected = buildVillageEvidence({ ...base, source: 'SERIAL', connected: false, status: 'NORMAL', measurementScope: 'HOUSE', lastPacketAt: 10_000, v: 3.7, i: 0.034 }, [], 10_100)
+  assert.match(disconnected.find((e) => e.id === 'village.status').value, /최신 값 없음/)
+  assert.match(disconnected.find((e) => e.id === 'village.measurement.total').value, /연결이 끊겼거나/)
+  assert.ok(!disconnected.find((e) => e.id === 'village.measurement.total').value.includes('3.70 V'))
+
+  const unknown = buildVillageEvidence({ ...base, source: 'SERIAL', connected: true, status: 'NORMAL', measurementScope: 'UNKNOWN', lastPacketAt: 10_000, v: 3.7, i: 0.034 }, [], 10_100)
+  assert.match(unknown.find((e) => e.id === 'village.status').value, /데이터 없음/)
+  assert.match(unknown.find((e) => e.id === 'village.measurement.total').value, /센서 범위가 확인되지 않음/)
 })
 
 test('keeps command and automatic UNO summaries available for event comparison', () => {

@@ -69,7 +69,7 @@ function LiveReport({ id }: { id: string }) {
 
 function LiveBody({ inc }: { inc: LiveIncident }) {
   const cand = inspectionCandidate(inc.scope)
-  const data = inc.points.map((p) => ({ s: +((p.t - inc.startedAt) / 1000).toFixed(1), inlet: p.i * 1000, house: p.ih != null ? p.ih * 1000 : null, lamp: p.il != null ? p.il * 1000 : null }))
+  const data = inc.points.map((p) => ({ s: +((p.t - inc.startedAt) / 1000).toFixed(1), inlet: inc.measurementScope === 'BOTH' ? p.i * 1000 : null, house: p.ih != null ? p.ih * 1000 : null, lamp: p.il != null ? p.il * 1000 : null }))
   return (
     <Frame id={`LIVE-${inc.id}`} kind={`마을 모형 직류 계측 · ${inc.source === 'MOCK' ? '시뮬레이터' : '실측 장치'}`} title={inc.title}>
       <Block no={1} title="요약">
@@ -118,7 +118,7 @@ function LiveBody({ inc }: { inc: LiveIncident }) {
         {inc.caseId && <p>등록한 사건: <Link to={`/cases/${inc.caseId}`}>{inc.caseId}</Link></p>}
       </Block>
       <Block no={8} title="데이터 출처 · 한계">
-        <p>{inc.points.some((p) => p.ih != null && p.il != null) ? '주택·가로등 분기 INA219 두 개와 그 합(인입)' : '마을 전체 INA219 한 개'}의 기록으로 만든 직류 계측이에요. {inc.points.some((p) => p.ih != null && p.il != null) ? '구간 안 설비는 현장 점검이 필요합니다.' : '분기별 계측이 없어 특정 분기·설비를 확인할 수 없습니다.'} 설비 정보는 모형 정보이며 실제 현장에서는 K-GIS 계통 추적 자료가 필요합니다.</p>
+        <p>{inc.measurementScope === 'HOUSE' ? '주택 분기 INA219 0x40 실측' : inc.measurementScope === 'BOTH' ? '주택·가로등 분기 INA219 두 개 및 합계 실측' : inc.measurementScope === 'LAMP' ? '가로등 분기 INA219 0x41 실측' : '센서 범위 미기록'}로 만든 직류 계측이에요. {inc.measurementScope === 'HOUSE' ? '가로등 전류는 측정하지 않았으며 주택 분기 안의 설비는 현장 점검이 필요합니다.' : inc.measurementScope === 'BOTH' ? '구간 안 설비는 현장 점검이 필요합니다.' : '측정하지 않은 분기의 상태를 판단하지 않습니다.'} 설비 정보는 모형 정보이며 실제 현장에서는 K-GIS 계통 추적 자료가 필요합니다.</p>
       </Block>
     </Frame>
   )

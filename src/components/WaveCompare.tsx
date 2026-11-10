@@ -20,7 +20,7 @@ export interface CompareRow { s: number; inlet: number | null; house: number | n
 
 /** 사건 기록 → 비교용 행 (0초 = 고장표시 발생) */
 export const incidentRows = (inc: LiveIncident): CompareRow[] =>
-  inc.points.map((p) => ({ s: +((p.t - inc.startedAt) / 1000).toFixed(1), inlet: p.i * 1000, house: p.ih != null ? p.ih * 1000 : null, lamp: p.il != null ? p.il * 1000 : null }))
+  inc.points.map((p) => ({ s: +((p.t - inc.startedAt) / 1000).toFixed(1), inlet: inc.measurementScope === 'BOTH' ? p.i * 1000 : null, house: p.ih != null ? p.ih * 1000 : null, lamp: p.il != null ? p.il * 1000 : null }))
 
 /** 평소(0초 전) 파형과 지금(0초 후) 파형을 같은 눈금으로 나란히 비교 */
 export default function WaveCompare({ rows, zeroLabel = '고장표시 발생' }: { rows: CompareRow[]; zeroLabel?: string }) {
@@ -94,4 +94,3 @@ export default function WaveCompare({ rows, zeroLabel = '고장표시 발생' }:
     </div>
   )
 }
-

@@ -17,7 +17,7 @@ test('does not call one-sensor UNO telemetry a working two-zone measurement', ()
 })
 
 test('reports measured zone values only when the connected UNO supplies both zones', () => {
-  const status = unoStatus({ connected: true, source: 'SERIAL', zones: { HOUSE: {}, LAMP: {} }, lastNote: null })
+  const status = unoStatus({ connected: true, source: 'SERIAL', measurementScope: 'BOTH', zones: { HOUSE: {}, LAMP: {} }, lastNote: 'INA219 house(0x40)=OK lamp(0x41)=OK' })
 
   assert.equal(status.state, 'ok')
   assert.match(status.text, /두 구간 실측 수신/)

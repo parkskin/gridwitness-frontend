@@ -19,9 +19,13 @@ function liveOf(id: PartId, snap: VillageSnapshot): [Tone, string] {
       return snap.connected ? ['ok', `D2 ${snap.relay ? 'LOW(공급)' : 'HIGH(차단)'} · I2C로 0.5초마다 측정 · ${snap.source === 'MOCK' ? '시뮬레이터' : '실측'}`] : ['err', '연결 끊김']
     case 'inaH':
     case 'inaL': {
-      const z = snap.zones?.[id === 'inaH' ? 'HOUSE' : 'LAMP']
+      const kind = id === 'inaH' ? 'HOUSE' : 'LAMP'
+      const z = snap.zones?.[kind]
       if (snap.status === 'NO_DATA') return ['off', '데이터 없음']
-      return z ? ['ok', `${z.v.toFixed(2)} V · ${z.i.toFixed(3)} A · 켜진 LED ${z.estLit}개 추정`] : ['ok', `${snap.v.toFixed(2)} V · ${snap.i.toFixed(3)} A (마을 전체)`]
+      if (z) return ['ok', `${z.v.toFixed(2)} V · ${z.i.toFixed(3)} A · 켜진 LED ${z.estLit}개 추정`]
+      if (snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' && kind === 'LAMP') return ['off', '가로등 전류 미측정 · LED는 릴레이 상태만 시각화']
+      if (snap.source === 'SERIAL' && snap.measurementScope === 'LAMP' && kind === 'HOUSE') return ['off', '주택 분기 센서 미응답']
+      return ['off', '해당 분기 실측값 없음']
     }
     default: {
       const line = LOAD_LINES.find((l) => l.board === id)

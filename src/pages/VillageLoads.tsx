@@ -14,12 +14,13 @@ export default function VillageLoads() {
       <PageHeader
         crumbs={[{ label: '스마트 마을', to: '/village' }, { label: '부하' }]}
         title="부하"
-        description={`LED 5개는 채널 릴레이(D3~D7)로 하나씩 제어합니다. ${snap.zones ? '감지된 센서 2개로 주택·가로등 구간을 따로 측정합니다.' : '구간별 계측은 없으며 연결된 센서의 전체 값만 사용합니다.'}`}
+        description={`LED 5개는 채널 릴레이(D3~D7)로 하나씩 제어합니다. ${snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' ? '주택 분기만 실측합니다. 가로등은 릴레이 점등 시각화만 하며 전류 판정에서 제외합니다.' : snap.zones ? '감지된 INA219로 구간을 따로 측정합니다.' : '센서 범위 확인 후 실측 분석을 시작합니다.'}`}
       />
       {snap.zones && (
         <Metrics cols={2}>
           {(['HOUSE', 'LAMP'] as const).map((k) => {
             const z = snap.zones![k]
+            if (!z) return null
             return (
               <Metric key={k} label={`${ZONE_LABEL[k]} · ${ZONE_SENSOR[k]}`} value={z.i.toFixed(3)} unit="A" foot={`예상 ${z.expected.toFixed(3)} A · ${z.v.toFixed(2)} V · 켜진 LED ${z.estLit}/${zoneChannels(k).length}`} />
             )

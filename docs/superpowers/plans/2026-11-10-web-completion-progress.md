@@ -1,0 +1,25 @@
+# 실행 기록 — 2026-11-10-web-completion.md
+
+- 사용자 요청: 전체 웹 결함 수정 및 실제 우노 연결 검증. 기존 점검은 실물 검증을 포함하지 않았음을 명확히 알렸다.
+- 작업본: frontend 격리 브랜치 sunwoo162/coelacanth, API fix/web-completion-20261110. 기존 package-lock.json 54행 삭제와 API DB 변경은 사용자 변경으로 보존·커밋 제외.
+- Ruling: 점검 결과와 사용자의 즉시 수정 요청으로 구현 범위가 정해져 있어 추가 설계 승인 질문 없이 실행한다.
+- Ruling: 서버 인증은 환경변수 접근 토큰을 지원하되 공개 시연 서비스를 갑자기 잠그지 않는다. 미설정 상태는 공개 시연임을 UI에서 명시한다. 실제 접근 통제 활성화는 배포 설정/접근 범위 결정이 필요하다.
+- Ruling: GPU가 없는 현재 노트북의 qwen2.5:7b는 실제 LLM 경로 검증에만 사용한다. CPU 실행을 GPU 검증 완료로 표시하지 않는다.
+- 분담: API/DB/LLM, 웹 사건·모델·파형, 웹 대화·마을 보존은 독립 파일 소유권을 지정해 병렬 구현. 루트는 공통 HTTP·설정·장치 경계·실측·통합·배포 담당.
+- 회귀 시험 실행: node --import ./tests/register.mjs --import ./tests/setup.mjs --test tests/connection.test.mjs. 센서 오류 0 변환/잘못된 채널/구조화 API 오류/시간 제한 4건 RED→GREEN. 스트림 잠금 해제 누락 1건 추가 RED→GREEN.
+- 전체 웹 회귀 시험: npm test → 24 passed (통합 중간 시점, 이후 변경 후 최종 재실행 필요).
+- 실제 장치: COM19, VID2341 PID0043. 직접 수신 3.6~3.68V/33~34mA. INA219 house0x40 OK / lamp0x41 NOT FOUND.
+- 실제 브라우저: 기존 사용자가 localhost5174에 허용한 우노 권한을 별도 시험 프로필에서 사용해 Chrome native Web Serial 연결. CH3 0/1 실행 → 260점 사건2건과 실제 채널 상태·전류 변화 수신, 원래 채널 상태 복구. 증거: %TEMP%/gridwitness-web-fix-20261110/native-webserial.json.
+- 확인: 학교 서버는 CPU4개/메모리4GB, GPU/Ollama 없음. 노트북 Ollama qwen2.5:7b는 CPU(size_vram=0). GPU 접속 정보는 비동기 질문으로 요청 중.
+- 남은 통합 확인: 실제 우노→수정 웹→서버 저장/재조회, 전체 빌드/브라우저/독립 리뷰, API 백업·시험 배포, 웹 PR.
+- 사용자 추가 요청: 전체 프로그램의 누락·모순도 확인하고 확인된 결함은 고친다.
+- 기준 저장소 재확인: ParksKin `main`은 `a54e534`이며 기존 coelacanth 작업 폴더는 FRTU UI 변경 4개 파일에서 최신 main과 달랐다. 최신 ParksKin main 기반 `coelacanth-audit` 작업 트리를 새로 만들어 이후 수정은 그 기준으로 한다. 기존 `package-lock.json` 변경과 계획·기록 파일은 기존 폴더에 보존한다.
+- 추가 확인: 운영 API health/database 응답 정상, ParksKin CORS preflight 200, CN/RU classifier capability true, 저장된 demo case GET analysis `completed`/`PF`, `village/records` GET 응답. API auth `required=false`; assistant `qwen2.5:3b`, available은 Ollama 모델 목록 확인일 뿐 생성 성공 보증이 아니다.
+- 추가 결함 A: 설정 화면이 `assistant.available=true`를 LLM 연결 성공으로 표현. `assistantStatusLabel`이 모델 목록 확인과 실제 채택 응답을 구분하도록 수정하고 connection 회귀 테스트 RED→GREEN.
+- 추가 결함 B: `KepcoReal`이 raw fetch로 공통 API 토큰·시간제한·오류 처리를 우회. `getKepcoUsagePage`로 공통 `apiRequest` 사용. 토큰·주소·쿼리 테스트 RED→GREEN.
+- 추가 문서 수정: 사용설명서의 옛 `jyx-07` CORS 주소, 로직 문서의 항상 보류·RU 계약 누락, `types.ts` API 매핑 주석, LLM 상태 의미를 현재 기준으로 수정. 전체 점검표 `docs/프로그램_전체점검_2026-11-10.md` 작성.
+- 최신 ParksKin 기준 최종 웹 시험: `npm test` 43/43, `npm run build` 성공, `npm run lint -- --format json` errors 0 / warnings 29. Pages 하위 경로 `/gridwitness-frontend/` 빌드 성공; 출력 경고는 951.53KB minified Label 청크와 CaseDetail ineffective dynamic import.
+- 배포 읽기 확인: ParksKin Pages 및 HTML 참조 JS/CSS 13개 모두 200, last-modified 2026-11-10 09:23:02 UTC. 이는 수정 전 현재 배포본이다. 브라우저 headless 렌더는 Chromium/Edge가 `Multiple targets are not supported in headless mode`로 실패, 실제 클릭·모바일 UI 확인은 미완료.
+- 현재 COM19는 Windows 장치 목록에서 Arduino UNO로 보이지만 포트는 이번에 열지 않았다. 이전 실측 기록상 INA219 0x40 OK / 0x41 NOT FOUND. 실제 UI→API 데이터 저장·재조회는 이번 코드 변경 배포 후 재확인해야 한다.
+- 추가 점검 변경 커밋: `88c1f99 fix: audit API readiness and public data requests` (ParksKin 기준 branch `fix/full-program-audit`). Draft PR: https://github.com/parkskin/gridwitness-frontend/pull/2. PR connector create는 403이었으나, 사용자 인증된 `gh`로 동일한 draft PR을 열었다.
+- 마지막 리뷰: 변경 diff·오류 처리·토큰 전달·현재 API 계약을 자체 리뷰했다. 독립 리뷰어/실제 브라우저 클릭 검증은 완료하지 못했다. 운영 수정/배포와 물리 장치 확인이 남아 있어 PR은 draft로 둔다.

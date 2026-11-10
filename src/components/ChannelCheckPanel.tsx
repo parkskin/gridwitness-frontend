@@ -44,7 +44,7 @@ export default function ChannelCheckPanel({ snap }: { snap: VillageSnapshot }) {
                     <td className="num" style={{ textAlign: 'left' }}>{r.before === null ? '—' : `${r.before.toFixed(3)} A`}</td>
                     <td className="num" style={{ textAlign: 'left' }}>{r.after === null ? '—' : `${r.after.toFixed(3)} A`}</td>
                     <td className="num" style={{ textAlign: 'left' }}>{r.drop === null ? '—' : `${r.drop.toFixed(3)} A`}</td>
-                    <td className={r.verdict === 'OK' ? 'ok' : r.verdict === 'SKIPPED' ? 'muted' : 'bad'}>{VERDICT_TEXT[r.verdict]}{r.note ? ` · ${r.note}` : ''}</td>
+                    <td className={r.verdict === 'OK' ? 'ok' : r.verdict === 'SKIPPED' || r.verdict === 'UNMEASURED' ? 'muted' : 'bad'}>{VERDICT_TEXT[r.verdict]}{r.note ? ` · ${r.note}` : ''}</td>
                   </tr>
                 )
               })}

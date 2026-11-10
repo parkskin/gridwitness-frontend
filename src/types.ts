@@ -191,6 +191,8 @@ export interface IotPoint {
   i: number
   expected: number
   score: number
+  /** 실제 측정에 포함된 센서 범위. 구형 기록에는 없음. */
+  scope?: 'BOTH' | 'HOUSE' | 'LAMP' | 'UNKNOWN'
   /** 구간별 전류·예상 전류 (INA219 두 개 구성). 예전 기록에는 없음 */
   ih?: number
   il?: number

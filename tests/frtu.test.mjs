@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { frtuHistory } from '../src/lib/frtu.ts'
+import { frtuDisplayViews, frtuHistory, frtuViews } from '../src/lib/frtu.ts'
 import { getVillage } from '../src/lib/village.ts'
 
 function serialSnapshot() {
@@ -40,4 +40,29 @@ test('returns branch history only from recorded branch sensor samples', () => {
   const result = frtuHistory(snap, 'house')
   assert.equal(result.available, true)
   assert.deepEqual(result.points.map((p) => p.mA), [20])
+})
+
+test('demo lamp FRTU values are presentation-only and never enter measured history or assistant views', () => {
+  const snap = serialSnapshot()
+  snap.measurementScope = 'HOUSE'
+  snap.relay = true
+  snap.channels = { h1: true, h2: true, h3: true, l1: true, l2: true }
+  const display = frtuDisplayViews(snap).lamp
+  assert.equal(display.available, true)
+  assert.equal(display.i, 0.056 * 2 * 0.97)
+  assert.equal(frtuViews(snap).lamp.available, false)
+  assert.equal(frtuHistory(snap, 'lamp').available, false)
+  assert.deepEqual(snap.zones, null)
+})
+
+test('demo lamp FRTU display follows physical relay states for outage and channel-off conditions', () => {
+  const snap = serialSnapshot()
+  snap.measurementScope = 'HOUSE'
+  snap.relay = false
+  snap.channels = { h1: true, h2: true, h3: true, l1: true, l2: true }
+  assert.equal(frtuDisplayViews(snap).lamp.status, 'OFF')
+  snap.relay = true
+  snap.channels.l1 = false
+  snap.channels.l2 = false
+  assert.equal(frtuDisplayViews(snap).lamp.i, 0)
 })

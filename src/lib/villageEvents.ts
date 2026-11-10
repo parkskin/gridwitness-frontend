@@ -11,6 +11,7 @@ import { API_CHANGED_EVENT } from './backend'
 
 export interface VillageEvent {
   source?: 'SERIAL' | 'MOCK'
+  sensorScope?: 'BOTH' | 'HOUSE' | 'LAMP' | 'UNKNOWN'
   deviceId?: string
   ev: number
   dtMs: number

@@ -4,7 +4,7 @@ import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react
 import { ToneMappingMode } from 'postprocessing'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { CatmullRomCurve3, Vector3, type Group, type Mesh } from 'three'
-import { FRTUS, frtuViews, locateFault, type FrtuId } from '../../lib/frtu'
+import { FRTUS, frtuDisplayViews, locateFault, type FrtuId } from '../../lib/frtu'
 import { IOT_CHANNELS, lightView, speech, type ChannelId, type NodeStatus, type VillageSnapshot } from '../../lib/village'
 import House from './House'
 import { BOX_FLOOR, HOUSE_POS, LAMP_POS, POLES, routePoints, type HouseChannel, type LampChannel } from './layout'
@@ -236,9 +236,9 @@ export default function VillageScene({
   onFrtu?: (id: FrtuId) => void
 }) {
   const shot = useMemo(() => (underground ? (selectedPart ? partShot(selectedPart) : UNDER) : frtu ? frtuShot(frtu) : SURFACE), [underground, selectedPart, frtu])
-  const fv = frtuViews(snap)
+  const fv = frtuDisplayViews(snap)
   // 지금 고장 구간 (고장표시로 좁힌 분기) → 그 분기의 전선을 강조
-  const hotScope = locateFault(snap, fv).scope
+  const hotScope = locateFault(snap).scope
   const bg = useMemo(() => (night ? skyGradient('#070d1c', '#1b2b4d') : skyGradient('#9fcbf2', '#e9f3fb')), [night])
   const [wrap, active] = useOnScreen<HTMLDivElement>()
   const dpr = fx ? Math.min(window.devicePixelRatio, 1.75) : Math.min(window.devicePixelRatio, 1.25)

@@ -5,17 +5,17 @@
 //   INA219 두 개: A4(SDA), A5(SCL) 공통
 //
 // 웹(Web Serial, 115200 baud)과 줄 단위로 통신합니다.
-// INA219가 1개만 연결된 경우(0x40 또는 0x41 자동 감지)에는 마을 전체 값(v·i)만 보내고 구간 값은 생략합니다.
+// INA219 2개가 연결되면 분기별 값과 합계를 보냅니다. 1개만 연결되면 감지된 분기 값만 v·i로 보내며, 웹은 센서 주소 안내로 범위를 구분합니다.
 //   장치 → 웹 (0.5초마다):
 //     {"v":5.02,"i":0.281,"relay":1,"ch":[1,1,1,1,1],"vh":5.02,"ih":0.168,"vl":5.01,"il":0.113}
-//       v·i      : 마을 전체 (두 구간 합계)          relay : 마을 전원이 들어가 있으면 1
+//       v·i      : 두 센서 연결 시 합계, 단일 센서면 해당 분기값   relay : 마을 전원이 들어가 있으면 1
 //       ch       : 채널 1~5 릴레이 상태 (1 = 켜짐)   vh·ih : 주택 구간 (INA219 ①)   vl·il : 가로등 구간 (INA219 ②)
 //   장치 → 웹 (사건이 날 때만, v3.1): 사건 앞뒤 전류를 10 ms 간격으로 녹화한 '사건 파형'
 //     {"ev":3,"dt":10,"pre":60,"src":"auto","cmd":"","ch":[1,1,1,1,1],"i":[2841,2840,...]}
 //       ev  : 사건 번호         dt : 샘플 간격(ms)      pre : 사건 시점 앞쪽 샘플 수
 //       src : auto = 명령 없이 전류가 갑자기 변함 / cmd = 웹 명령(개폐) 직후
 //       cmd : src=cmd 일 때 받은 명령   ch : 녹화가 끝났을 때 채널 상태
-//       i   : 마을 전체 전류, 0.01 mA 단위 정수 (최대 pre + 200개; 부팅 직후는 실제 확보한 pre만 보냄)
+//       i   : 연결된 센서 전류(두 개면 합계, 하나면 해당 분기), 0.01 mA 단위 정수
 //   웹 → 장치:
 //     RELAY 0 / RELAY 1   마을 전체 정전 / 복구
 //     CH <1~5> <0|1>      채널 하나 끄기 / 켜기   (예: CH 3 0 → 주택 2 소등)
@@ -108,7 +108,7 @@ float loadCurrent(Adafruit_INA219& ina, bool ok) {
   return isnan(i) || isinf(i) || i < 0 ? 0 : i;
 }
 
-// 마을 전체 전류 (0.01 mA 단위 정수)
+// 연결된 INA219 측정 전류 합 (0.01 mA 단위 정수, 단일 센서면 그 분기만)
 int16_t totalCurrent100() {
   float a = loadCurrent(inaHouse, houseOk) + loadCurrent(inaLamp, lampOk);
   long u = (long)(a * 100000.0 + 0.5);
@@ -216,7 +216,8 @@ void setup() {
   Serial.print(houseOk ? F("OK") : F("NOT FOUND"));
   Serial.print(F(" lamp(0x41)="));
   Serial.println(lampOk ? F("OK") : F("NOT FOUND"));
-  if (houseOk != lampOk) Serial.println(F("#sensor 1개만 감지: 마을 전체 값으로 보냅니다 (구간 값 없음)"));
+  if (houseOk && !lampOk) Serial.println(F("#단일 센서 모드: 주택 분기(0x40) 실측값만 보냅니다. 가로등은 미측정"));
+  else if (!houseOk && lampOk) Serial.println(F("#단일 센서 모드: 가로등 분기(0x41) 실측값만 보냅니다. 주택은 미측정"));
   if (!houseOk && !lampOk) Serial.println(F("#INA219 없음: v·i는 0으로 보냅니다. 배선을 확인하세요"));
 }
 
@@ -232,7 +233,7 @@ void printSensors() {
     v = vh > vl ? vh : vl;
     i = ih + il;
   } else if (houseOk) {
-    v = vh; i = ih;  // 센서 1개 = 마을 전체
+    v = vh; i = ih;  // 주택 분기 실측만
   } else if (lampOk) {
     v = vl; i = il;
   } else {

@@ -103,7 +103,7 @@ export default function Village() {
   const [part, setPart] = useState<PartId | null>(null)
   const [showPins, setShowPins] = useState(false)
   const [params] = useSearchParams()
-  const [frtu, setFrtu] = useState<FrtuId | null>(() => (isFrtuId(params.get('frtu')) ? (params.get('frtu') as FrtuId) : params.get('ai') === '1' ? 'inlet' : null))
+  const [frtu, setFrtu] = useState<FrtuId | null>(() => (isFrtuId(params.get('frtu')) ? (params.get('frtu') as FrtuId) : params.get('ai') === '1' ? snap.measurementScope === 'HOUSE' ? 'house' : 'inlet' : null))
   const [controls, setControls] = useState(false)
   const nav = useNavigate()
   // AI 도우미가 열리면 화면의 카드 패널(FRTU 요약·제어판·LED 상세)은 내려감
@@ -199,7 +199,7 @@ export default function Village() {
             고화질 {fx ? '켜짐' : '꺼짐'}
           </button>
           <button className={`btn btn-sm glass ${controls ? 'on' : ''}`} onClick={() => { setControls(!controls); setFrtu(null) }} aria-pressed={controls}>제어판</button>
-          {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu('inlet') }}>FRTU 보기</button>}
+        {!underground && !frtu && <button className="btn btn-sm glass btn-ai" onClick={() => { setSelected(null); setControls(false); setFrtu(snap.measurementScope === 'HOUSE' ? 'house' : 'inlet') }}>FRTU 보기</button>}
           <span style={{ marginLeft: 'auto' }}><PowerButton snap={snap} /></span>
           {underground && (
             <>
@@ -238,14 +238,14 @@ export default function Village() {
             )}
             <div className="hud-nums num">
               <span><b>{snap.v.toFixed(2)}</b> V</span>
-              <span><b>{snap.i.toFixed(2)}</b> A</span>
-              <span><b>{snap.p.toFixed(2)}</b> W</span>
+              <span title={snap.measurementScope === 'HOUSE' ? '주택 분기 실측 전류' : '확인된 계측 전류'}><b>{snap.i.toFixed(2)}</b> A{snap.measurementScope === 'HOUSE' ? ' 주택 실측' : ''}</span>
+              <span><b>{snap.p.toFixed(2)}</b> W{snap.measurementScope === 'HOUSE' ? ' 주택' : ''}</span>
             </div>
             <div className="hud-lit" aria-label={`켜진 LED ${snap.estLit}개`}>
               {IOT_CHANNELS.map((c, k) => (
                 <i key={c.id} className={snap.leds[c.id].lit ? 'on' : ''} title={c.name} data-k={k} />
               ))}
-              <span className="small muted">{snap.estLit}/5</span>
+              <span className="small muted">{snap.estLit}/{snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' ? 3 : 5}{snap.measurementScope === 'HOUSE' ? ' 주택 추정' : ''}</span>
             </div>
           </div>
         )}
@@ -264,10 +264,10 @@ export default function Village() {
             <dl className="kv" style={{ marginTop: 14 }}>
               <div><dt>제어</dt><dd>{sel.relay}</dd></div>
               <div><dt>측정</dt><dd>{ZONE_SENSOR[sel.kind]}</dd></div>
-              <div><dt>{ZONE_LABEL[sel.kind]} 전류</dt><dd>{snap.zones ? `${snap.zones[sel.kind].i.toFixed(3)} A` : `${snap.i.toFixed(3)} A (마을 전체)`}</dd></div>
-              <div><dt>켜진 LED</dt><dd>{snap.zones ? `${snap.zones[sel.kind].estLit} / ${zoneChannels(sel.kind).length}` : `${snap.estLit} / 5`}</dd></div>
+              <div><dt>{ZONE_LABEL[sel.kind]} 전류</dt><dd>{snap.zones?.[sel.kind] ? `${snap.zones[sel.kind]!.i.toFixed(3)} A (실측)` : snap.source === 'SERIAL' && sel.kind === 'LAMP' && snap.measurementScope === 'HOUSE' ? '미측정' : `${snap.i.toFixed(3)} A (${snap.measurementScope === 'HOUSE' ? '주택 분기 실측' : '확인된 센서값'})`}</dd></div>
+              <div><dt>켜진 LED</dt><dd>{snap.zones?.[sel.kind] ? `${snap.zones[sel.kind]!.estLit} / ${zoneChannels(sel.kind).length} (추정)` : sel.kind === 'LAMP' && snap.measurementScope === 'HOUSE' ? '릴레이 상태만 표시' : `${snap.estLit} / ${snap.measurementScope === 'HOUSE' ? 3 : 5} (추정)`}</dd></div>
             </dl>
-            <p className="hint">LED별 전류는 따로 재지 않고 구간 전류로 추정합니다.</p>
+            <p className="hint">{sel.kind === 'LAMP' && snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' ? '가로등은 전류 미측정이며 LED 모양은 릴레이 ON/OFF 상태를 표시합니다.' : 'LED별 전류는 따로 재지 않고 해당 구간 전류로 추정합니다.'}</p>
             <div className="row gap" style={{ marginTop: 12 }}>
               <button
                 className="btn btn-sm btn-primary"

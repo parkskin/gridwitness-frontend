@@ -383,11 +383,12 @@ export function LiveFrtuWaveAnalysis(props: Pick<Props, 'stacked' | 'compact' | 
   )
   if (offline && !hasLast) return offlineBar
   const views = frtuViews(snap)
-  const f = views.inlet
+  const focusId = props.focus ?? (snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' ? 'house' : 'inlet')
+  const f = views[focusId]
   const loc = locateFault(snap, views)
   const rule: FrtuRuleInfo = {
     label: `${STATUS_LABEL[f.status]} · ${FI_LABEL[f.fi]}`,
-    lines: [`인입 이상 점수 ${f.score.toFixed(2)} (주의 ${THRESHOLDS.warn} · 이상 ${THRESHOLDS.fault})`],
+    lines: [`${f.def.name} 이상 점수 ${f.score.toFixed(2)} (주의 ${THRESHOLDS.warn} · 이상 ${THRESHOLDS.fault})`],
   }
   return (
     <>

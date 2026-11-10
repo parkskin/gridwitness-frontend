@@ -1,7 +1,7 @@
 import type { VillageSnapshot } from './village'
 
 type Live = 'ok' | 'warn' | 'down'
-type HardwareSnapshot = Pick<VillageSnapshot, 'connected' | 'source' | 'zones' | 'lastNote'>
+type HardwareSnapshot = Pick<VillageSnapshot, 'connected' | 'source' | 'zones' | 'lastNote' | 'measurementScope'>
 
 export interface UnoStatus {
   state: Live
@@ -29,14 +29,19 @@ export function unoStatus(snap: HardwareSnapshot): UnoStatus {
     if (houseOk && lampOk && snap.zones) {
       return { state: 'ok', text: '두 구간 실측 수신', detail: `${house} · ${lamp} · 분기별 값 수신 중` }
     }
+    if (houseOk && !lampOk && snap.measurementScope === 'HOUSE') {
+      return { state: 'ok', text: '주택 분기 실측 수신', detail: `${house} · 가로등은 미측정, 릴레이 상태만 시각화` }
+    }
     if (houseOk && lampOk) {
       return { state: 'warn', text: '구간 계측 프레임 대기', detail: `${house} · ${lamp} · 구간별 측정값 없음` }
     }
     return { state: 'warn', text: `${house} · ${lamp}`, detail: '구간별 측정값 없음 · 센서 배선과 주소를 확인하세요' }
   }
 
-  if (snap.zones) {
+  if (snap.measurementScope === 'BOTH' && snap.zones) {
     return { state: 'ok', text: '두 구간 실측 수신', detail: '주택·가로등 분기별 값 수신 중' }
   }
+  if (snap.measurementScope === 'HOUSE') return { state: 'ok', text: '주택 분기 실측 수신', detail: '가로등은 미측정 · 릴레이 상태만 시각화' }
+  if (snap.measurementScope === 'LAMP') return { state: 'warn', text: '가로등 분기만 실측', detail: '주택 분기 센서 미응답' }
   return { state: 'warn', text: 'UNO 연결 · 구간 센서 미확인', detail: '현재 구간별 측정값 없음' }
 }

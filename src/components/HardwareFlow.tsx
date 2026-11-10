@@ -57,13 +57,14 @@ interface Avg {
 const pickI = (target: Target, p: IotPoint): number => {
   if (target === 'ALL') return p.i
   const kind = IOT_CHANNELS.find((c) => c.id === target)!.kind
-  return (kind === 'HOUSE' ? p.ih : p.il) ?? p.i
+  return (kind === 'HOUSE' ? p.ih : p.il) ?? (p.scope === 'BOTH' ? p.i : NaN)
 }
 const avg = (pts: IotPoint[], target: Target): Avg => {
   const n = Math.max(1, pts.length)
   const v = pts.reduce((s, x) => s + x.v, 0) / n
   const i = pts.reduce((s, x) => s + pickI(target, x), 0) / n
-  return { v, i, p: v * i, leds: Math.max(0, Math.min(5, Math.round(i / ledA()))) }
+  const houseOnly = pts.some((x) => x.scope === 'HOUSE') && (target === 'ALL' || IOT_CHANNELS.find((c) => c.id === target)?.kind === 'HOUSE')
+  return { v, i, p: v * i, leds: Math.max(0, Math.min(houseOnly ? 3 : 5, Math.round(i / ledA()))) }
 }
 
 interface Result {
@@ -95,7 +96,11 @@ export default function HardwareFlow() {
   const running = RUNNING.includes(run.phase)
   const channelMode = target !== 'ALL'
   const def = channelMode ? IOT_CHANNELS.find((c) => c.id === target)! : null
-  const canStart = live && snap.relay && snap.relayPending === null && !running && (!channelMode || (snap.canControl && snap.channels[target]))
+  const supportedTarget = !real || snap.measurementScope !== 'HOUSE' || target === 'ALL' || IOT_CHANNELS.find((c) => c.id === target)?.kind === 'HOUSE'
+  useEffect(() => {
+    if (real && snap.measurementScope === 'HOUSE' && target !== 'ALL' && IOT_CHANNELS.find((c) => c.id === target)?.kind === 'LAMP') setTarget('ALL')
+  }, [real, snap.measurementScope, target])
+  const canStart = live && supportedTarget && snap.relay && snap.relayPending === null && !running && (!channelMode || (snap.canControl && snap.channels[target]))
 
   // 시나리오가 끈 것(전체 또는 LED 하나)을 켜고 끔
   const cut = () => (targetRef.current === 'ALL' ? setRelay(false) : setChannel(targetRef.current as ChannelId, false))
@@ -183,7 +188,7 @@ export default function HardwareFlow() {
     const { before, during, after } = result
     const where = real ? '실측 INA219' : '시뮬레이터'
     const one = result.target === 'ALL' ? null : IOT_CHANNELS.find((c) => c.id === result.target)!
-    const unit = one ? `${ZONE_LABEL[one.kind]} 전류` : '마을 전체 전류'
+    const unit = one ? `${ZONE_LABEL[one.kind]} 전류` : snap.measurementScope === 'HOUSE' ? '주택 분기 실측 전류' : '마을 전체 전류'
     return {
       id: Date.now() % 1_000_000_000,
       source: snap.source,
@@ -277,9 +282,9 @@ export default function HardwareFlow() {
           <label className="field" style={{ margin: 0 }}>
             끌 대상
             <select value={target} onChange={(e) => setTarget(e.target.value as Target)} disabled={running}>
-              <option value="ALL">마을 전체 (전체 릴레이 D2)</option>
+              <option value="ALL">{snap.measurementScope === 'HOUSE' ? '전체 전원 릴레이 · 주택 분기 실측' : '마을 전체 (전체 릴레이 D2)'}</option>
               {IOT_CHANNELS.map((c) => (
-                <option key={c.id} value={c.id} disabled={!snap.canControl}>{c.name} · LED {c.ch} ({c.relay})</option>
+                <option key={c.id} value={c.id} disabled={!snap.canControl || (real && snap.measurementScope === 'HOUSE' && c.kind === 'LAMP')}>{c.name} · LED {c.ch} ({c.kind === 'LAMP' && real && snap.measurementScope === 'HOUSE' ? '전류 미측정' : c.relay})</option>
               ))}
             </select>
           </label>
@@ -302,7 +307,7 @@ export default function HardwareFlow() {
 
       {result && event && diagnosis && (
         <>
-          <Section title="③ LED 소등과 INA219 측정값 변화" description={`차단 전 · 차단 중 · 복구 후의 평균값입니다.${resultTarget === 'ALL' ? ' 마을 전체 전류 기준입니다.' : ` ${ZONE_LABEL[IOT_CHANNELS.find((c) => c.id === resultTarget)!.kind]} INA219 전류 기준입니다.`}`}>
+          <Section title="③ LED 소등과 INA219 측정값 변화" description={`차단 전 · 차단 중 · 복구 후의 평균값입니다.${resultTarget === 'ALL' ? snap.measurementScope === 'HOUSE' ? ' 주택 분기 INA219 실측 기준입니다.' : ' 확인된 마을 전체 전류 기준입니다.' : ` ${ZONE_LABEL[IOT_CHANNELS.find((c) => c.id === resultTarget)!.kind]} INA219 전류 기준입니다.`}`}>
             <div className="table-wrap">
               <table>
                 <thead>
@@ -315,7 +320,7 @@ export default function HardwareFlow() {
                       <td className="num" style={L}>{a.v.toFixed(2)} V</td>
                       <td className="num" style={L}>{a.i.toFixed(3)} A</td>
                       <td className="num" style={L}>{a.p.toFixed(2)} W</td>
-                      <td className="num" style={L}>{a.leds} / 5</td>
+                      <td className="num" style={L}>{a.leds} / {snap.measurementScope === 'HOUSE' ? 3 : 5}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -4,7 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { api } from '../api'
 import { useActor } from '../lib/actor'
 import { CHART } from '../lib/chart'
-import { FRTUS, frtuHistory, frtuViews, locateFault, type FrtuId } from '../lib/frtu'
+import { FRTUS, frtuDisplayViews, frtuHistory, locateFault, type FrtuId } from '../lib/frtu'
 import { SOURCE_LABEL, type VillageSnapshot } from '../lib/village'
 import { MODEL_SCOPES, parseCsv, diagnose } from '../lib/waveform'
 import type { AnalysisResult, InputDiagnosis, ModelCountry } from '../types'
@@ -111,7 +111,7 @@ export function CsvAnalysis() {
 
 /** FRTU 3대를 나란히 보여 주고 고르게 하는 줄 */
 export function FrtuStrip({ snap, value, onPick }: { snap: VillageSnapshot; value: FrtuId; onPick: (id: FrtuId) => void }) {
-  const views = frtuViews(snap)
+  const views = frtuDisplayViews(snap)
   return (
     <div className="frtu-strip" role="tablist" aria-label="FRTU 선택">
       {FRTUS.map((f) => {
@@ -143,14 +143,14 @@ export function FaultLocationBox({ snap }: { snap: VillageSnapshot }) {
 /** 화면 오른쪽에 붙는 FRTU 요약 패널 (FRTU를 누르면 열림). 자세한 분석·대화는 상세 화면에서 */
 /** 3D 마을 옆 FRTU 패널: 전류·전압만 간단히. 자세한 분석은 FRTU 파형 분석 페이지에서 */
 export default function AiPanel({ snap, frtu, onPick, onClose }: { snap: VillageSnapshot; frtu: FrtuId; onPick: (id: FrtuId) => void; onClose: () => void }) {
-  const f = frtuViews(snap)[frtu]
+  const f = frtuDisplayViews(snap)[frtu]
   const sensorSource = !snap.connected
     ? '장치 연결 끊김'
     : snap.source === 'MOCK'
       ? '시뮬레이터 생성값'
       : frtu === 'inlet'
-        ? snap.zones ? '두 INA219 구간 실측 합' : '응답 센서 1개의 전체 실측값'
-        : snap.zones ? `${f.def.sensor} 실측` : `${f.def.sensor} 미응답`
+        ? snap.measurementScope === 'BOTH' ? '두 INA219 구간 실측 합' : '인입 계측 없음'
+        : f.available ? `${f.def.sensor}` : `${f.def.sensor} 미측정`
   return (
     <aside className="ai-panel" aria-label="FRTU 요약">
       <div className="ai-head">
@@ -167,7 +167,7 @@ export default function AiPanel({ snap, frtu, onPick, onClose }: { snap: Village
         ) : (
           <p className="small muted">{f.unavailableReason}</p>
         )}
-        {frtu === 'inlet' && <p className="xs muted">{snap.source === 'MOCK' ? '시뮬레이터 값입니다.' : snap.zones ? '인입값은 두 분기 실측값을 합산한 값입니다.' : '인입값은 응답한 센서 하나의 실측값입니다.'} 직류 모형 계측이며 교류 고장파형 분석과는 별도입니다.</p>}
+        {frtu === 'inlet' && <p className="xs muted">{snap.source === 'MOCK' ? '시뮬레이터 값입니다.' : snap.measurementScope === 'BOTH' ? '인입값은 두 분기 실측값을 합산한 계산값입니다.' : '인입 전류를 측정하지 않았습니다. 다른 분기 측정값으로 대체하지 않습니다.'} 직류 모형 계측이며 교류 고장파형 분석과는 별도입니다.</p>}
       </div>
       <Link to={`/frtu?id=${frtu}`} className="ai-more">FRTU 파형 분석 열기 <IconArrowRight /></Link>
     </aside>

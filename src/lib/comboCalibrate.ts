@@ -50,6 +50,10 @@ export const cancelComboCalibrate = () => {
 export async function runComboCalibrate(samples = 4) {
   if (state.running) return
   const snap = getVillage()
+  if (snap.source === 'SERIAL' && snap.measurementScope !== 'BOTH') {
+    set({ error: '5개 채널 조합표를 보정하려면 주택·가로등 INA219 두 센서가 모두 응답해야 합니다. 현재 센서 범위에서는 보정을 시작하지 않았습니다.' })
+    return
+  }
   if (snap.source !== 'SERIAL' || !snap.connected) return set({ error: '실측 장치(우노)가 연결돼 있을 때만 맞출 수 있습니다.' })
   if (!snap.canControl || !snap.relay) return set({ error: '마을 전원이 들어와 있고 채널을 조종할 수 있을 때만 맞출 수 있습니다.' })
   cancelled = false

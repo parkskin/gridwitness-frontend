@@ -18,12 +18,14 @@ export function buildVillageEvidence(s: VillageSnapshot, events: AnalyzedEvent[]
   const evidence: VillageEvidence[] = []
   const add = (id: string, label: string, value: string) => evidence.push({ id: `village.${id}`, label, value: value.slice(0, 1000) })
   const source = SOURCE_LABEL[s.source]
-  const stale = s.source === 'SERIAL' && s.connected && (!s.lastPacketAt || now - s.lastPacketAt > 5000)
-  const available = s.connected && s.status !== 'NO_DATA' && !stale
+  const stale = s.source === 'SERIAL' && (!s.connected || !s.lastPacketAt || now - s.lastPacketAt > 5000)
+  const scopeKnown = s.source === 'MOCK' || s.measurementScope !== 'UNKNOWN'
+  const available = s.connected && s.status !== 'NO_DATA' && !stale && scopeKnown
   add('source', '자료 출처', `${source} · ${DEVICE_INFO[s.source].deviceId}`)
-  add('status', '마을 상태', available ? STATUS_LABEL[s.status] : stale ? '오래된 계측 · 최신 값 없음' : '계측 데이터 없음')
+  add('measurement.scope', '실측 범위', s.source === 'MOCK' ? '시뮬레이터 · 주택·가로등 모델 데이터' : s.measurementScope === 'HOUSE' ? 'INA219 0x40 주택 분기 실측만 포함 · 가로등은 미측정' : s.measurementScope === 'BOTH' ? 'INA219 0x40 주택 + 0x41 가로등 분기 실측' : s.measurementScope === 'LAMP' ? 'INA219 0x41 가로등 분기 실측만 포함' : '센서 주소 미확인 · 위치 판정 불가')
+  add('status', '마을 상태', available ? STATUS_LABEL[s.status] : stale ? '연결 끊김 또는 오래된 계측 · 최신 값 없음' : '계측 데이터 없음')
   if (available) {
-    add('measurement.total', '전체 실측', `${s.v.toFixed(2)} V · ${(s.i * 1000).toFixed(1)} mA · 릴레이 ${s.relay ? '투입' : '차단'} · ${new Date(s.lastPacketAt!).toISOString()}`)
+    add('measurement.total', s.measurementScope === 'HOUSE' ? '주택 분기 실측' : s.measurementScope === 'LAMP' ? '가로등 분기 실측' : '전체 실측', `${s.v.toFixed(2)} V · ${(s.i * 1000).toFixed(1)} mA · 릴레이 ${s.relay ? '투입' : '차단'} · ${new Date(s.lastPacketAt!).toISOString()}`)
     add('channels', '채널 상태', IOT_CHANNELS.map((c) => `${c.name} ${s.channels[c.id] ? 'ON' : 'OFF'}`).join(' · '))
     const views = frtuViews(s)
     for (const f of Object.values(views)) add(`frtu.${f.def.id}`, f.def.name, f.available
@@ -32,7 +34,7 @@ export function buildVillageEvidence(s: VillageSnapshot, events: AnalyzedEvent[]
     const loc = locateFault(s, views)
     add('location', 'FRTU 구간 판정', `${loc.title}${loc.reasons.length ? ` · ${loc.reasons.join(' / ')}` : ''}`)
   } else {
-    add('measurement.total', '전체 실측', stale ? '최신 계측이 5초 이상 수신되지 않음' : '현재 계측값 없음')
+    add('measurement.total', '전체 실측', stale ? '연결이 끊겼거나 최신 계측이 5초 이상 수신되지 않음' : '센서 범위가 확인되지 않음 또는 현재 계측값 없음')
     for (const id of ['inlet', 'house', 'lamp']) add(`frtu.${id}`, `${id} FRTU`, '현재 측정 불가 · 0으로 간주하지 않음')
   }
   for (const [index, item] of events.slice(0, 3).entries()) {
@@ -42,7 +44,7 @@ export function buildVillageEvidence(s: VillageSnapshot, events: AnalyzedEvent[]
     const verdict = item.verdict.kind === 'ANSWERED' || item.verdict.kind === 'WITHHELD'
       ? `${item.verdict.kind === 'ANSWERED' ? '판정' : '보류'} ${item.verdict.labelKo} · 점수 ${item.verdict.score.toFixed(2)} (확률 아님)`
       : item.verdict.kind === 'NO_MODEL' ? '분류 모델 없음' : `입력 거부 · ${item.verdict.reasons[0] ?? '사유 없음'}`
-    add(`${prefix}.summary`, `저장 사건 #${e.ev}`, `${eventSource} · ${e.src === 'cmd' ? `명령 직후 ${e.cmd || '(명령 미기록)'}` : '자동 감지'} · ${verdict} · ${e.i100.length}개 원시 표본 · 채널 ${e.ch.join('')}`)
+    add(`${prefix}.summary`, `저장 사건 #${e.ev}`, `${eventSource} · 센서 범위 ${e.sensorScope ?? '기록 당시 미기록'} · ${e.src === 'cmd' ? `명령 직후 ${e.cmd || '(명령 미기록)'}` : '자동 감지'} · ${verdict} · ${e.i100.length}개 원시 표본 · 채널 ${e.ch.join('')}`)
     if (item.verdict.kind === 'ANSWERED' || item.verdict.kind === 'WITHHELD') {
       item.verdict.evidence.slice(0, 4).forEach((f, n) => add(`${prefix}.feature.${n}`, f.label, `${f.value.toFixed(3)} · 기여도 ${f.contribution >= 0 ? '+' : ''}${f.contribution.toFixed(3)}`))
     }
@@ -58,7 +60,7 @@ export function buildVillageEvidence(s: VillageSnapshot, events: AnalyzedEvent[]
       ? `${item.verdict.kind === 'ANSWERED' ? '판정' : '보류'} ${item.verdict.labelKo} · 점수 ${item.verdict.score.toFixed(2)} (확률 아님)`
       : item.verdict.kind === 'NO_MODEL' ? '분류 모델 없음' : `입력 거부 · ${item.verdict.reasons[0] ?? '사유 없음'}`
     const eventSource = e.source === 'MOCK' ? '시뮬레이터' : e.source === 'SERIAL' ? '실측 Arduino' : '출처 미기록'
-    add(`event.${kind}.summary`, `${kind === 'command' ? '최근 명령 사건' : '최근 자동 감지 사건'} #${e.ev}`, `${eventSource} · ${new Date(e.receivedAt).toISOString()} · ${e.src === 'cmd' ? `명령 직후 ${e.cmd || '(명령 미기록)'}` : '자동 감지'} · ${verdict} · ${e.i100.length}개 원시 표본 · 채널 ${e.ch.join('')}`)
+    add(`event.${kind}.summary`, `${kind === 'command' ? '최근 명령 사건' : '최근 자동 감지 사건'} #${e.ev}`, `${eventSource} · 센서 범위 ${e.sensorScope ?? '기록 당시 미기록'} · ${new Date(e.receivedAt).toISOString()} · ${e.src === 'cmd' ? `명령 직후 ${e.cmd || '(명령 미기록)'}` : '자동 감지'} · ${verdict} · ${e.i100.length}개 원시 표본 · 채널 ${e.ch.join('')}`)
   }
   return evidence.slice(0, 32)
 }
@@ -105,8 +107,11 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
   // 지난 사건 조회는 현재 계측과 구분한다. 그 외 현재 상태·전압·원인에는
   // 연결 없음/오래된 계측의 0 값을 측정값이나 정상 근거로 쓰지 않는다.
   const pastEvent = has(t, '마지막', '최근', '판정', '사건')
-  if (!pastEvent && (!s.connected || s.status === 'NO_DATA'))
+  if (!pastEvent && (!s.connected || s.status === 'NO_DATA' || (s.source === 'SERIAL' && s.measurementScope === 'UNKNOWN')))
     return '현재 계측값이 없어 전압·전류나 정상·복구 여부를 판단할 수 없어요. 실측 장치 연결과 최신 데이터 수신을 확인해 주세요.'
+
+  if (s.source === 'SERIAL' && s.measurementScope === 'HOUSE' && has(t, '가로등'))
+    return '현재 UNO는 주택 INA219(0x40)만 응답하고 있어요. 가로등은 릴레이 상태만 시각화하며 전류를 측정하지 않아 가로등 고장 여부를 답할 근거가 없습니다.'
 
   // 위치·구간: FRTU별 고장표시로 좁힌 결과를 그대로 읽어 줌
   if (has(t, '어디', '위치', '구간', '분기', '먼저', '점검', 'FRTU', 'frtu') && !has(t, '전류', '전압')) {
@@ -135,11 +140,12 @@ export function answer(text: string, events: AnalyzedEvent[]): string {
     const fv = frtuViews(s)
     return FRTUS.map((f) => `${f.name}: ${fv[f.id].available ? `${(fv[f.id].i * 1000).toFixed(1)} mA (예상 ${(fv[f.id].expected * 1000).toFixed(1)} mA)` : '값 없음'}`).join('\n')
   }
-  if (has(t, '전압')) return `전압은 ${s.v.toFixed(2)} V예요.`
+  if (has(t, '전압')) return `${s.measurementScope === 'HOUSE' ? '주택 분기 실측 전압' : s.measurementScope === 'LAMP' ? '가로등 분기 실측 전압' : '전압'}은 ${s.v.toFixed(2)} V예요.${s.source === 'SERIAL' && s.measurementScope !== 'BOTH' ? ' 다른 분기의 전압은 측정하지 않았어요.' : ''}`
   if (has(t, '상태', '어때', '괜찮', '현황', '정상')) {
     if (!s.connected) return '실측 장치와 연결이 끊겨 있어요. 메뉴의 실측 장치에서 다시 연결해 주세요.'
     const off = IOT_CHANNELS.filter((c) => !s.leds[c.id].channelOn).map((c) => c.name)
-    return `마을은 '${STATUS_LABEL[s.status]}' 상태예요. ${s.v.toFixed(2)} V, ${(s.i * 1000).toFixed(1)} mA, 이상 점수 ${s.score.toFixed(2)}${off.length ? `. 꺼 둔 LED: ${off.join(', ')}` : '. LED는 모두 켜져 있어요'}.`
+    const scope = s.source === 'SERIAL' && s.measurementScope === 'HOUSE' ? '주택 분기 실측 기준' : s.source === 'SERIAL' && s.measurementScope !== 'BOTH' ? '확인된 단일 분기 실측 기준' : '마을'
+    return `${scope}은 '${STATUS_LABEL[s.status]}' 상태예요. ${s.v.toFixed(2)} V, ${(s.i * 1000).toFixed(1)} mA, 이상 점수 ${s.score.toFixed(2)}${off.length ? `. 꺼 둔 LED 릴레이: ${off.join(', ')}` : '. LED 릴레이는 모두 켜져 있어요'}${s.source === 'SERIAL' && s.measurementScope !== 'BOTH' ? ' 다른 분기는 측정하지 않았어요.' : ''}.`
   }
   return "아직 그 질문은 이해하지 못해요. '지금 상태 어때?', '어느 분기가 문제야?', '왜 이상이야?'처럼 물어봐 주세요."
 }

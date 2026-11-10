@@ -89,7 +89,7 @@ test('live incidents keep their event prefix and never infer restoration from NO
   const { getVillage } = await import('../src/lib/village.ts')
   const adapter = await import('../src/api/village.ts')
   const start = Date.now()
-  const snapshot = { ...getVillage(), source: 'SERIAL', connected: true, relay: true, status: 'FAULT', v: 5, i: .005, expected: .03, score: .9, zones: null, events: [] }
+  const snapshot = { ...getVillage(), source: 'SERIAL', connected: true, measurementScope: 'HOUSE', relay: true, status: 'FAULT', v: 5, i: .005, expected: .03, score: .9, zones: null, events: [] }
   for (let i = 0; i < 250; i++) live.observeVillage({ ...snapshot, packets: i, lastPacketAt: start + i, history: [{ t: start + i, v: 5, i: .005, expected: .03, score: .9, p: .025 }] })
   const record = adapter.getCachedVillageRecords('incident')[0]
   assert.equal(record.data.points.length, 250)

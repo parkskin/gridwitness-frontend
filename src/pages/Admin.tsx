@@ -5,7 +5,7 @@ import { getVillagePersistence, listVillageRecords } from '../api/village'
 import { Empty, ErrorState, Metric, Metrics, NODE_TONE, PageHeader, Section, Segmented, Status, TableSkeleton } from '../components/ui'
 import { fmtTime } from '../lib/actor'
 import { apiBase } from '../lib/backend'
-import { calibrateLedA, DEFAULT_LED_A, DEFAULT_THRESHOLDS, DEVICE_INFO, ledA, resetThresholds, setLedA, setThresholds, SOURCE_LABEL, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
+import { calibrateLedA, DEFAULT_LED_A, DEFAULT_THRESHOLDS, DEVICE_INFO, IOT_CHANNELS, ledA, resetThresholds, setLedA, setThresholds, SOURCE_LABEL, STATUS_LABEL, TICK_MS, useVillage } from '../lib/village'
 import { CASE_TYPE_LABEL, type ActivityItem, type CaseSummary, type CaseType } from '../types'
 
 /** 슬라이더 + 숫자 + 설명이 한 줄인 설정 항목 */
@@ -132,7 +132,7 @@ export default function Admin() {
               </button>
             </Setting>
           </div>
-          <p className="hint">지금 전류 <b className="num">{snap.i.toFixed(3)} A</b> · 켜진 채널 {Object.values(snap.channels).filter(Boolean).length}개 → 예상 <b className="num">{snap.expected.toFixed(3)} A</b></p>
+          <p className="hint">{snap.measurementScope === 'HOUSE' ? '주택 분기 실측 전류' : '지금 전류'} <b className="num">{snap.i.toFixed(3)} A</b> · {snap.measurementScope === 'HOUSE' ? '주택에서 켜진' : '켜진'} 채널 {snap.measurementScope === 'HOUSE' ? IOT_CHANNELS.filter((c) => c.kind === 'HOUSE' && snap.channels[c.id]).length : Object.values(snap.channels).filter(Boolean).length}개 → 예상 <b className="num">{snap.expected.toFixed(3)} A</b></p>
         </Section>
       </div>
 

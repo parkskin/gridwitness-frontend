@@ -14,6 +14,7 @@ export interface IncidentPoint {
   i: number
   ih: number | null
   il: number | null
+  measurementScope?: VillageSnapshot['measurementScope']
 }
 
 export interface LiveIncident {
@@ -24,6 +25,7 @@ export interface LiveIncident {
   observerId: string
   rawEventRecordId?: string | null
   source: DataSource
+  measurementScope: VillageSnapshot['measurementScope']
   startedAt: number
   /** 복구된 시각 (아직 진행 중이면 null) */
   clearedAt: number | null
@@ -151,7 +153,7 @@ export const dismissIncident = (id: string | number) => {
 }
 export const markIncidentRegistered = (id: string | number, caseId: string) => patch(id, (x) => ({ ...x, caseId }))
 
-const toPoint = (h: VillageSnapshot['history'][number]): IncidentPoint => ({ t: h.t, i: h.i, ih: h.ih ?? null, il: h.il ?? null })
+const toPoint = (h: VillageSnapshot['history'][number]): IncidentPoint => ({ t: h.t, i: h.i, ih: h.ih ?? null, il: h.il ?? null, measurementScope: h.scope })
 
 /** 계측값만으로 낸 원인 판정 (고장표시 종류 + 전류 변화량) */
 function causeOf(s: VillageSnapshot): string {
@@ -227,6 +229,7 @@ export function observeVillage(s: VillageSnapshot) {
     observerId,
     rawEventRecordId,
     source: s.source,
+    measurementScope: s.measurementScope,
     startedAt: now,
     clearedAt: null,
     scope: loc.scope,

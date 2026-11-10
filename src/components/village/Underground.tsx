@@ -573,8 +573,11 @@ function PartOutline({ id, color }: { id: PartId; color: string }) {
 /** 부품 이름표 아래 한 줄 */
 function partReadout(id: PartId, snap: VillageSnapshot): string {
   if (id === 'inaH' || id === 'inaL') {
-    const z = snap.zones?.[id === 'inaH' ? 'HOUSE' : 'LAMP']
-    return z ? `${z.v.toFixed(2)} V · ${z.i.toFixed(3)} A` : `${snap.v.toFixed(2)} V · ${snap.i.toFixed(3)} A`
+    const kind = id === 'inaH' ? 'HOUSE' : 'LAMP'
+    const z = snap.zones?.[kind]
+    if (z) return `${z.v.toFixed(2)} V · ${z.i.toFixed(3)} A`
+    if (snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' && kind === 'LAMP') return '전류 미측정 · 릴레이 시각화'
+    return '실측값 없음'
   }
   if (id === 'relay') return `D2 ${snap.relay ? 'LOW' : 'HIGH'} · ${contactClosed(snap) ? '공급' : '차단'}${snap.supplyFault === 'STUCK' ? ' (고착)' : ''}`
   const line = LOAD_LINES.find((l) => l.board === id)

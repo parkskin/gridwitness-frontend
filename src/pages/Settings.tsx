@@ -97,7 +97,7 @@ export default function Settings() {
 
       <Row
         title="회로 구성"
-        description={<>설계는 INA219 두 개로 주택·가로등을 나눠 재는 구성입니다. 현재 {snap.source === 'MOCK' ? '시뮬레이터' : !snap.connected || snap.status === 'NO_DATA' ? '실측 센서 확인 전' : snap.zones ? '센서 2개 · 구간별 실측' : '센서 1개 · 전체 실측'} 상태입니다. 센서 1개일 때는 분기 실측값을 만들지 않습니다. LED 5개는 채널 릴레이(D3~D7)로 제어합니다 (설계 정격 {NOMINAL_V} V).</>}
+        description={<>INA219 응답 주소를 기준으로 분기 실측 범위를 정합니다. 현재 {snap.source === 'MOCK' ? '시뮬레이터' : snap.measurementScope === 'BOTH' ? '주택·가로등 두 분기 실측' : snap.measurementScope === 'HOUSE' ? '주택 분기만 실측 · 가로등은 릴레이 상태만 시각화' : snap.measurementScope === 'LAMP' ? '가로등 분기만 실측 · 주택은 미측정' : '센서 범위 확인 전'} 상태입니다. 실측하지 않은 분기값을 만들지 않습니다. LED 5개는 채널 릴레이(D3~D7)로 제어합니다 (설계 정격 {NOMINAL_V} V).</>}
       >
         <ChannelMap />
       </Row>

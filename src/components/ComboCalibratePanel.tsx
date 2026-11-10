@@ -6,11 +6,11 @@ import { Section, Status } from './ui'
 export default function ComboCalibratePanel({ snap }: { snap: VillageSnapshot }) {
   const st = useComboCalibrate()
   const cal = getComboCalibration()
-  const ready = snap.source === 'SERIAL' && snap.connected && snap.canControl && snap.relay
+  const ready = snap.source === 'SERIAL' && snap.connected && snap.canControl && snap.relay && snap.measurementScope === 'BOTH'
   return (
     <Section
       title="기준 다시 맞추기"
-      description="LED가 모두 정상일 때 누르세요. 32가지 채널 조합을 차례로 만들며 정상 전류를 재서(약 2분) 이 PC의 기준으로 씁니다. 같은 모형이라도 USB 포트·충전기가 바뀌면 정상 전류가 조금 달라지기 때문입니다."
+      description={snap.source === 'SERIAL' && snap.measurementScope === 'HOUSE' ? '현재는 주택 분기만 실측합니다. 두 분기 5개 채널의 기존 학습 조합표를 잘못 덮어쓰지 않도록 보정을 막았습니다.' : 'LED가 모두 정상일 때 누르세요. 32가지 채널 조합을 차례로 만들며 정상 전류를 재서(약 2분) 이 PC의 기준으로 씁니다. 같은 모형이라도 USB 포트·충전기가 바뀌면 정상 전류가 조금 달라지기 때문입니다.'}
       actions={
         st.running ? (
           <button className="btn" onClick={cancelComboCalibrate}>

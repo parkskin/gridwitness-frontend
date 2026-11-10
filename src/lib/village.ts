@@ -15,6 +15,7 @@ import { NO_GRANTED_PORT, onSerialPlug, openSerial, parseFrame, serialSupported,
 export type ChannelId = 'h1' | 'h2' | 'h3' | 'l1' | 'l2'
 export type ChannelKind = 'HOUSE' | 'LAMP'
 export type DataSource = 'MOCK' | 'SERIAL'
+export type MeasurementScope = 'BOTH' | 'HOUSE' | 'LAMP' | 'UNKNOWN'
 /** LED 위치 고장(OPEN·GROUND)과 전원·제어 고장(SAG·OUTAGE·STUCK) */
 export type FaultKind = 'OPEN' | 'GROUND' | 'SAG' | 'OUTAGE' | 'STUCK'
 export type NodeStatus = 'NORMAL' | 'OFF' | 'WARNING' | 'FAULT' | 'OUTAGE' | 'NO_DATA'
@@ -67,7 +68,7 @@ export const DEVICE_INFO: Record<DataSource, { deviceId: string; sensor: string;
   MOCK: { deviceId: 'arduino-sim-01', sensor: 'INA219 ×2 (시뮬레이터)', port: 'SIM' },
   SERIAL: { deviceId: 'arduino-village', sensor: 'INA219 (실측, 감지된 개수만큼)', port: 'Web Serial 115200' },
 }
-export const IOT_MODEL = 'iot-combo-v3 (채널 조합별 실측 정상 전류)'
+export const IOT_MODEL = 'iot-combo-v3 (주택·가로등 합산 조합별 실측 정상 전류)'
 export const NOMINAL_V = 5
 /** LED 1개(저항 포함)가 흘리는 전류 A 기본값. 실제 LED·저항·전원 전압에 따라 크게 달라서 관리자 화면에서 보정할 수 있음 */
 // 실측 (2026-11-08, USB 전원): LED 1개 9~12 mA. 여러 개를 켜면 전압이 내려가 합이 맞지 않으므로 판정은 아래 조합표를 쓴다
@@ -99,7 +100,8 @@ export function setLedA(a: number) {
 export function calibrateLedA(): { ok: true; a: number; n: number; vMin: number | null } | { ok: false; reason: string } {
   if (!snap.connected || snap.status === 'NO_DATA') return { ok: false, reason: '장치에서 측정값을 받고 있지 않습니다.' }
   if (!snap.relay) return { ok: false, reason: '마을 전원이 꺼져 있습니다. 전력 복구 뒤에 시도하세요.' }
-  const n = IOT_CHANNELS.filter((c) => snap.channels[c.id] && !snap.faults[c.id]).length
+  const counted = IOT_CHANNELS.filter((c) => snap.channels[c.id] && !snap.faults[c.id] && (snap.source !== 'SERIAL' || snap.measurementScope === 'BOTH' || c.kind === (snap.measurementScope === 'HOUSE' ? 'HOUSE' : 'LAMP')))
+  const n = counted.length
   if (n < 1) return { ok: false, reason: '켜져 있는 LED 채널이 없습니다.' }
   if (snap.i < 0.003) return { ok: false, reason: `전류가 거의 없습니다(${snap.i.toFixed(3)} A). LED가 켜져 있는지 확인하세요.` }
   const a = snap.i / n
@@ -262,6 +264,7 @@ export interface ComboDiagnosis {
 export const COMBO_TOL_A = (COMBO_JSON as { tol_a?: number }).tol_a ?? 0.001
 /** 지금 조합에서 채널 하나를 끄면 줄어들 것으로 예상되는 전류 (조합표). 표에 없으면 null */
 export function expectedDrop(id: ChannelId): number | null {
+  if (source === 'SERIAL' && measurementScope === 'HOUSE' && IOT_CHANNELS.find((c) => c.id === id)?.kind === 'HOUSE') return enabled[id] ? ledA() : null
   const key = commandKey()
   const j = IOT_CHANNELS.find((c) => c.id === id)!.ch - 1
   if (key[j] !== '1') return null
@@ -301,6 +304,8 @@ export interface VillageSnapshot {
   lastLine: string | null
   /** 스케치가 보낸 '#' 안내 줄 중 가장 최근 것 (센서를 찾았는지 등) */
   lastNote: string | null
+  /** 실제 센서 응답으로 확인된 측정 범위. 단일 센서값을 마을 전체값으로 확대 해석하지 않음 */
+  measurementScope: MeasurementScope
   lastPacketAt: number | null
   packets: number
   /** 마을 전체 전원(릴레이) */
@@ -326,7 +331,7 @@ export interface VillageSnapshot {
   /** 이 브라우저에 이전에 허용한 포트가 없어 자동 재연결이 불가능함 (클릭해서 다시 허용해야 함) */
   needsGrant: boolean
   /** 구간별 측정. 구간 측정이 없는 예전 장치는 null */
-  zones: Record<ChannelKind, ZoneState> | null
+  zones: Partial<Record<ChannelKind, ZoneState>> | null
   /** 조합표 판정 결과 (실측 장치, 이상일 때) */
   diagnosis: ComboDiagnosis | null
   history: (Omit<IotPoint, 't'> & { t: number; p: number })[]
@@ -411,6 +416,7 @@ let badFrames = 0
 let rawLines = 0
 let lastLine: string | null = null
 let lastNote: string | null = null
+let measurementScope: MeasurementScope = 'UNKNOWN'
 let lastError: string | null = null
 let scenario: Scenario | null = null
 const listeners = new Set<() => void>()
@@ -470,7 +476,10 @@ function ledStates(zones: VillageSnapshot['zones']): Record<ChannelId, LedState>
     // 채널이 켜져 있으면 켜진 것으로 보고 전류 부족은 전체 판정·'켜진 LED 수'로만 알린다. 어느 LED인지는 채널 점검으로 확인
     if (!zones) return true
     const on = zoneChannels(c.kind).filter((x) => enabled[x.id])
-    return on.findIndex((x) => x.id === c.id) < zones[c.kind].estLit
+    const zone = zones[c.kind]
+    // 측정하지 않는 가로등은 LED 릴레이 명령 상태만 시각화한다.
+    if (!zone) return true
+    return on.findIndex((x) => x.id === c.id) < zone.estLit
   }
   return Object.fromEntries(
     IOT_CHANNELS.map((c) => [
@@ -489,6 +498,7 @@ function initial(): VillageSnapshot {
     rawLines: 0,
     lastLine: null,
     lastNote: null,
+    measurementScope: source === 'MOCK' ? 'BOTH' : 'UNKNOWN',
     lastPacketAt: null,
     packets: 0,
     relay,
@@ -525,6 +535,7 @@ function emit(patch: Partial<VillageSnapshot> = {}) {
   snap = {
     ...snap,
     ...patch,
+    measurementScope: source === 'MOCK' ? 'BOTH' : measurementScope,
     source,
     connected,
     lastError,
@@ -571,14 +582,18 @@ function tick() {
 
   const m = source === 'SERIAL' ? latest!.frame : mockMeasure()
   const { v, i } = m
+  const scope: MeasurementScope = source === 'MOCK' ? 'BOTH' : measurementScope
+  if (source === 'SERIAL' && scope === 'UNKNOWN' && !m.zones) {
+    return emit({ v, i, p: v * i, expected: 0, score: 0, status: 'NO_DATA', estLit: 0, zones: null, diagnosis: null, lastPacketAt: latest!.at, packets: snap.packets + 1 })
+  }
   const eh = expectedZone('HOUSE')
   const el = expectedZone('LAMP')
-  let expected = eh + el
+  let expected = scope === 'HOUSE' ? eh : scope === 'LAMP' ? el : eh + el
   let score = anomalyScore(v, i, expected)
-  // 센서 1개(구간 측정 없음)인 실측 장치: 실측으로 학습한 조합표로 판정 (USB 전원 전압 강하까지 반영됨)
+  // 전체 범위(BOTH) 단일 센서 장치만 기존 5채널 학습 조합표를 쓴다. 단일 분기값에 이 표를 적용하지 않는다.
   let diagnosis: ComboDiagnosis | null = null
   let comboLit: number | null = null
-  if (!m.zones && relay) {
+  if (!m.zones && scope === 'BOTH' && relay) {
     const key = commandKey()
     const j = comboJudge(key, i)
     if (j) {
@@ -589,7 +604,7 @@ function tick() {
     }
   }
   let zones: VillageSnapshot['zones'] = null
-  if (m.zones) {
+  if (m.zones || (source === 'SERIAL' && (scope === 'HOUSE' || scope === 'LAMP'))) {
     // 구간마다 따로 점수를 내서, 한 구간의 누설과 다른 구간의 단선이 합계에서 서로 가려지지 않게 함
     const zoneState = (kind: ChannelKind, r: { v: number; i: number }, exp: number): ZoneState => ({
       ...r,
@@ -597,12 +612,18 @@ function tick() {
       score: anomalyScore(r.v, r.i, exp),
       estLit: Math.max(0, Math.min(zoneChannels(kind).length, Math.round(r.i / ledA()))),
     })
-    zones = { HOUSE: zoneState('HOUSE', m.zones.house, eh), LAMP: zoneState('LAMP', m.zones.lamp, el) }
-    score = Math.max(score, zones.HOUSE.score, zones.LAMP.score)
+    zones = m.zones
+      ? { HOUSE: zoneState('HOUSE', m.zones.house, eh), LAMP: zoneState('LAMP', m.zones.lamp, el) }
+      : scope === 'HOUSE'
+        ? { HOUSE: zoneState('HOUSE', { v, i }, eh) }
+        : { LAMP: zoneState('LAMP', { v, i }, el) }
+    score = Math.max(score, ...Object.values(zones).map((z) => z!.score))
   }
   const status = classify(v, i, score, relay)
-  const estLit = zones ? zones.HOUSE.estLit + zones.LAMP.estLit : comboLit ?? Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
-  const point: IotPoint = { t: now, v, i, expected, score, ...(m.zones && { ih: m.zones.house.i, il: m.zones.lamp.i, eh, el }) }
+  const estLit = zones
+    ? (zones.HOUSE?.estLit ?? 0) + (zones.LAMP?.estLit ?? 0)
+    : comboLit ?? Math.max(0, Math.min(IOT_CHANNELS.length, Math.round(i / ledA())))
+  const point: IotPoint = { t: now, v, i, expected, score, scope, ...((m.zones || scope === 'HOUSE') && { ih: m.zones?.house.i ?? i, eh }), ...((m.zones || scope === 'LAMP') && { il: m.zones?.lamp.i ?? i, el }) }
 
   const events = [...snap.events]
   const open = events.findIndex((e) => e.clearedAt === null)
@@ -750,6 +771,21 @@ function onSerialLine(line: string) {
   // 스케치가 시작 상황을 알리는 안내 줄 (측정값이 아니므로 형식 오류로 세지 않음)
   if (line.startsWith('#')) {
     lastNote = line.slice(1, 160)
+    const sensors = line.match(/INA219 house\(0x40\)=(OK|NOT FOUND) lamp\(0x41\)=(OK|NOT FOUND)/)
+    if (sensors) {
+      const houseOk = sensors[1] === 'OK'
+      const lampOk = sensors[2] === 'OK'
+      measurementScope = houseOk && lampOk ? 'BOTH' : houseOk ? 'HOUSE' : lampOk ? 'LAMP' : 'UNKNOWN'
+    }
+    // Older UNO firmware says a single INA219 is the village total. Correct that diagnostic text
+    // from the address discovery above so the UI never repeats the incorrect scope claim.
+    if (/sensor 1개만 감지.*마을 전체 값/i.test(lastNote)) {
+      lastNote = measurementScope === 'HOUSE'
+        ? '구형 펌웨어 안내 보정: 주택 0x40 실측만 사용 · 가로등 전류 미측정'
+        : measurementScope === 'LAMP'
+          ? '구형 펌웨어 안내 보정: 가로등 0x41 실측만 사용 · 주택 전류 미측정'
+          : lastNote
+    }
     emit()
     return
   }
@@ -757,7 +793,7 @@ function onSerialLine(line: string) {
   if (line.startsWith('{"ev"')) {
     const ev = parseEventLine(line)
     if (ev) {
-      pushVillageEvent(ev)
+      pushVillageEvent({ ...ev, sensorScope: measurementScope })
       // 녹화 중(뒤 2.0초)에는 측정 줄이 쉬므로, 사건 줄의 채널 상태로 명령 확인을 대신한다
       if (ev.ch.length === 5) {
         IOT_CHANNELS.forEach((c) => {
@@ -806,6 +842,7 @@ async function attach(next: SerialLink) {
   rawLines = 0
   lastLine = null
   lastNote = null
+  measurementScope = 'UNKNOWN'
   lastError = null
   scenario = null
   IOT_CHANNELS.forEach((c) => (enabled[c.id] = true))

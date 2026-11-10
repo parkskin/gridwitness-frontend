@@ -26,12 +26,18 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
     const overA = Math.max(0, ...w.filter((p) => p.expected > 0).map((p) => p.i - p.expected))
     if (overA > ledA() && !w.some((p) => p.ih !== undefined)) findings.push(`실제 전류가 예상보다 최대 ${overA.toFixed(2)}A 많습니다 (누설·단락 가능성).`)
     // INA219 두 개 구성이면 구간(주택/가로등)까지 짚고, 아니면 마을 전체로만 말함
-    const zoned = w.some((p) => p.ih !== undefined)
+    const houseOnly = w.some((p) => p.scope === 'HOUSE')
+    const lampOnly = w.some((p) => p.scope === 'LAMP')
+    const zoned = w.some((p) => p.scope === 'BOTH' || (p.scope === undefined && p.ih !== undefined && p.il !== undefined))
     const short = (i: number | undefined, e: number | undefined, v: number) => (i !== undefined && e !== undefined && e > 0 && v > 4 ? Math.round((e - i) / ledA()) : 0)
-    if (zoned) {
+    if (zoned || houseOnly || lampOnly) {
       const zones = [
+        ...(zoned || houseOnly ? [
         { name: '주택 구간(INA219 ① 0x40)', missing: Math.max(0, ...w.map((p) => short(p.ih, p.eh, p.v))), over: Math.max(0, ...w.map((p) => (p.eh ? (p.ih ?? 0) - p.eh : 0))) },
+        ] : []),
+        ...(zoned || lampOnly ? [
         { name: '가로등 구간(INA219 ② 0x41)', missing: Math.max(0, ...w.map((p) => short(p.il, p.el, p.v))), over: Math.max(0, ...w.map((p) => (p.el ? (p.il ?? 0) - p.el : 0))) },
+        ] : []),
       ]
       for (const z of zones) {
         if (z.missing > 0) findings.push(`${z.name} 전류가 LED ${z.missing}개 분량만큼 적습니다 (LED 단선·접촉 불량 가능성). 채널 점검으로 어느 LED인지 확인할 수 있습니다.`)
@@ -54,7 +60,7 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
       device: {
         deviceId: DEVICE_INFO[e.source].deviceId,
         sensor: DEVICE_INFO[e.source].sensor,
-        scope: w.some((p) => p.ih !== undefined) ? '주택·가로등 구간 (INA219 2개)' : '마을 전체 (INA219 1개)',
+        scope: zoned ? '주택·가로등 분기 (INA219 2개)' : houseOnly ? '주택 분기 (INA219 0x40 실측, 가로등 미측정)' : lampOnly ? '가로등 분기 (INA219 0x41 실측, 주택 미측정)' : w.some((p) => p.ih !== undefined) ? '구간 계측 (구형 기록)' : '센서 범위 미기록',
         nominalV: NOMINAL_V,
         expectedA: e.expected,
         relayOn: e.relayOn,
@@ -63,7 +69,7 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
       window: w,
       diagnosis: { status, rows: w.length, cols: 4, issues, checkedAt: t },
       detection: {
-        model: IOT_MODEL,
+        model: houseOnly ? 'iot-house-residual-v1 (주택 분기 실측 잔차 규칙)' : lampOnly ? 'iot-lamp-residual-v1 (가로등 분기 실측 잔차 규칙)' : IOT_MODEL,
         maxScore: e.maxScore,
         status: e.status,
         maxResidualA,
@@ -71,8 +77,10 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
         findings,
         limitations: [
           '5V DC 축소 모형 기준이며 22.9kV 배전선로 결과로 해석하지 않습니다.',
-          w.some((p) => p.ih !== undefined)
+          zoned
             ? '구간(주택·가로등)별 전류까지만 측정하므로, 구간 안에서 어느 LED인지는 채널 점검으로 따로 확인해야 합니다.'
+            : houseOnly ? '주택 분기만 측정했으며 가로등 전류는 판정하지 않았습니다. 주택 안에서 어느 LED인지는 주택 채널 점검으로 확인해야 합니다.'
+            : lampOnly ? '가로등 분기만 측정했으며 주택 전류는 판정하지 않았습니다.'
             : '전체 전류만 측정하므로 어느 LED에서 문제가 생겼는지는 특정하지 않습니다.',
           '이상 점수는 예상 전류 대비 잔차로 계산한 값이며 고장 확률이 아닙니다.',
           '고장파형 4종 분류 모델과는 별개 모델입니다.',
@@ -81,7 +89,7 @@ export function buildIotCase(e: VillageEvent, actor: string, id: string): IotCas
       },
       reviews: [],
       history: [
-        { at: e.at, actor: DEVICE_INFO[e.source].deviceId, action: '이상 감지', detail: `마을 전체 · 점수 ${e.maxScore.toFixed(2)}${e.maxScore >= THRESHOLDS.fault ? ' (이상 기준 초과)' : ''}` },
+        { at: e.at, actor: DEVICE_INFO[e.source].deviceId, action: '이상 감지', detail: `${houseOnly ? '주택 분기 실측' : lampOnly ? '가로등 분기 실측' : zoned ? '주택·가로등 구간 합계' : '센서 범위 미기록'} · 점수 ${e.maxScore.toFixed(2)}${e.maxScore >= THRESHOLDS.fault ? ' (이상 기준 초과)' : ''}` },
         { at: t, actor, action: '사건 등록', detail: `계측 ${w.length}개 · 데이터 점검 ${status}` },
       ],
     }

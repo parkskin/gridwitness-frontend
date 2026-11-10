@@ -11,7 +11,7 @@ export const FRTU_WAVE_META: Record<FrtuWaveKey, { label: string; color: string 
   lamp: { label: '가로등 분기', color: '#24835a' },
 }
 
-export type FrtuWavePoint = Pick<IotPoint, 't' | 'i' | 'v'> & { ih?: number | null; il?: number | null }
+export type FrtuWavePoint = Pick<IotPoint, 't' | 'i' | 'v' | 'scope'> & { ih?: number | null; il?: number | null }
 
 export interface FrtuWaveSeries {
   key: FrtuWaveKey
@@ -51,7 +51,7 @@ export function buildFrtuWave(points: FrtuWavePoint[]): FrtuWave {
   const t = points.map((p) => (p.t - t0) / 1000)
   const dt = t.length > 1 ? (t[t.length - 1] - t[0]) / (t.length - 1) : 0
   const pick = (key: FrtuWaveKey, p: FrtuWavePoint) => {
-    const a = key === 'inlet' ? p.i : key === 'house' ? p.ih : p.il
+    const a = key === 'inlet' ? (p.scope === 'BOTH' ? p.i : undefined) : key === 'house' ? p.ih : p.il
     return typeof a === 'number' && Number.isFinite(a) ? a * 1000 : null
   }
   const series = (Object.keys(FRTU_WAVE_META) as FrtuWaveKey[])

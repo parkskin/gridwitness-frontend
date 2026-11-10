@@ -1,12 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { formatModelScore } from '../src/lib/modelScore.ts'
+import { formatModelScore, formatModelScoreWithCaveat } from '../src/lib/modelScore.ts'
 import { answer } from '../src/lib/assistant.ts'
 
 test('formats uncalibrated model scores as decimals, never percentages', () => {
   assert.equal(formatModelScore(0.4925), '0.49')
   assert.equal(formatModelScore(1), '1.00')
   assert.equal(formatModelScore(undefined), '—')
+})
+
+test('labels model scores as uncalibrated in compact operational views', () => {
+  assert.equal(formatModelScoreWithCaveat(0.92), '0.92 (정답 확률 아님)')
+  assert.doesNotMatch(formatModelScoreWithCaveat(0.92), /92%/)
 })
 
 test('village assistant describes recorded event score as an uncalibrated score', () => {

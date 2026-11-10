@@ -9,6 +9,7 @@ import { getVillage, linkEventToCase, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import { inspectionCandidate } from '../lib/gis'
 import { alertIncident } from '../lib/notify'
+import { formatModelScoreWithCaveat } from '../lib/modelScore'
 import { IconX } from './Icons'
 import WaveCompare, { incidentRows } from './WaveCompare'
 import FiCheckBox from './FiCheckBox'
@@ -197,7 +198,7 @@ function SheetBody({ inc }: { inc: LiveIncident }) {
         {v && (
           <div className="is-card">
             <span>사건 파형 AI <small>우노 녹화</small></span>
-            <strong>{v.kind === 'ANSWERED' ? `${v.labelKo} · 점수 ${v.score.toFixed(2)}` : v.kind === 'WITHHELD' ? `판단 보류 (1순위 ${v.labelKo})` : v.kind === 'NO_MODEL' ? '모델 학습 전' : '입력 거부'}</strong>
+            <strong>{v.kind === 'ANSWERED' ? `${v.labelKo} · 점수 ${formatModelScoreWithCaveat(v.score)}` : v.kind === 'WITHHELD' ? `판단 보류 (1순위 ${v.labelKo})` : v.kind === 'NO_MODEL' ? '모델 학습 전' : '입력 거부'}</strong>
           </div>
         )}
         <FiCheckBox check={fiCrossCheck(inc, rec)} compact />

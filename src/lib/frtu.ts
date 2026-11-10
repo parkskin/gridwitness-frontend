@@ -87,6 +87,20 @@ export function frtuViews(s: VillageSnapshot): Record<FrtuId, FrtuView> {
   return out
 }
 
+/** History samples contain only channels that were actually measured at that time. */
+export function frtuHistory(s: VillageSnapshot, id: FrtuId): { available: boolean; reason: string | null; points: { t: number; mA: number; v: number }[] } {
+  const view = frtuViews(s)[id]
+  if (!view.available) return { available: false, reason: view.unavailableReason, points: [] }
+  const points = s.history.flatMap((h) => {
+    const current = id === 'inlet' ? h.i : id === 'house' ? h.ih : h.il
+    return typeof current === 'number' && Number.isFinite(current) && Number.isFinite(h.v)
+      ? [{ t: h.t, mA: current * 1000, v: h.v }]
+      : []
+  })
+  if (!points.length) return { available: false, reason: '선택한 FRTU의 저장된 파형 표본이 없어요.', points: [] }
+  return { available: true, reason: null, points }
+}
+
 export type FaultScope = 'NO_DATA' | 'OFF' | 'NONE' | 'HOUSE' | 'LAMP' | 'BOTH' | 'UPSTREAM' | 'UNKNOWN'
 
 export interface FaultLocation {

@@ -100,7 +100,8 @@ export function parseEventLine(line: string): VillageEvent | null {
 export function checkEvent(e: VillageEvent): string[] {
   const bad: string[] = []
   if (e.dtMs !== EXPECTED_DT_MS) bad.push(`샘플 간격이 ${EXPECTED_DT_MS} ms가 아님 (스케치 v3.1 필요)`)
-  if (e.i100.length !== EXPECTED_SAMPLES || e.pre !== EXPECTED_PRE) bad.push(`길이가 ${EXPECTED_SAMPLES}샘플(앞 ${EXPECTED_PRE})이 아님`)
+  if (e.pre < EXPECTED_PRE) bad.push(`사건 전 실측 표본이 ${e.pre}/${EXPECTED_PRE}개뿐이라 분류 판정을 보류합니다 (원시 파형은 보존).`)
+  else if (e.i100.length !== EXPECTED_SAMPLES || e.pre !== EXPECTED_PRE) bad.push(`길이가 ${EXPECTED_SAMPLES}샘플(앞 ${EXPECTED_PRE})이 아님`)
   if (e.i100.some((x) => !Number.isFinite(x) || x < 0 || x >= 32767)) bad.push('측정 범위를 벗어난 값')
   return bad
 }

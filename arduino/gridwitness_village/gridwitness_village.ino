@@ -15,7 +15,7 @@
 //       ev  : 사건 번호         dt : 샘플 간격(ms)      pre : 사건 시점 앞쪽 샘플 수
 //       src : auto = 명령 없이 전류가 갑자기 변함 / cmd = 웹 명령(개폐) 직후
 //       cmd : src=cmd 일 때 받은 명령   ch : 녹화가 끝났을 때 채널 상태
-//       i   : 마을 전체 전류, 0.01 mA 단위 정수 (pre + post = 260개, 2.6초: 앞 0.6초 + 뒤 2.0초)
+//       i   : 마을 전체 전류, 0.01 mA 단위 정수 (최대 pre + 200개; 부팅 직후는 실제 확보한 pre만 보냄)
 //   웹 → 장치:
 //     RELAY 0 / RELAY 1   마을 전체 정전 / 복구
 //     CH <1~5> <0|1>      채널 하나 끄기 / 켜기   (예: CH 3 0 → 주택 2 소등)
@@ -66,6 +66,7 @@ long base100 = -1;          // 평소 전류 × 100 (0.01 mA 단위 × 100, 천�
 uint16_t postLeft = 0;      // 녹화 중이면 남은 샘플 수
 bool capCmd = false;
 String capCmdText;
+uint16_t capPre = PRE;
 uint16_t evNo = 0;
 unsigned long lastSample = 0;
 unsigned long quietUntil = 0;
@@ -116,6 +117,8 @@ int16_t totalCurrent100() {
 
 void startCapture(bool byCmd, const String& cmd) {
   if (postLeft > 0) return;  // 이미 녹화 중
+  // 명령이 부팅 직후 들어오면 링 버퍼의 초기 0을 실측처럼 내보내지 않는다.
+  capPre = filled < PRE ? filled : PRE;
   postLeft = POST;
   capCmd = byCmd;
   capCmdText = byCmd ? cmd : String();
@@ -128,7 +131,7 @@ void dumpCapture() {
   Serial.print(F(",\"dt\":"));
   Serial.print(SAMPLE_MS);
   Serial.print(F(",\"pre\":"));
-  Serial.print(PRE);
+  Serial.print(capPre);
   Serial.print(F(",\"src\":\""));
   Serial.print(capCmd ? F("cmd") : F("auto"));
   Serial.print(F("\",\"cmd\":\""));
@@ -139,9 +142,11 @@ void dumpCapture() {
     Serial.print(chOn[k] ? 1 : 0);
   }
   Serial.print(F("],\"i\":["));
-  for (uint16_t n = 0; n < RB; n++) {
+  const uint16_t captureLength = capPre + POST;
+  const uint16_t captureStart = (head + RB - captureLength) % RB;
+  for (uint16_t n = 0; n < captureLength; n++) {
     if (n) Serial.print(',');
-    Serial.print(ring[(head + n) % RB]);  // head 가 가장 오래된 값
+    Serial.print(ring[(captureStart + n) % RB]);
   }
   Serial.println(F("]}"));
   // 끝난 뒤의 값을 새 평소 값으로 (영구 단선이면 낮아진 값이 평소가 됨)

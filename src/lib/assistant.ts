@@ -46,6 +46,18 @@ export function buildVillageEvidence(s: VillageSnapshot, events: AnalyzedEvent[]
       item.verdict.evidence.slice(0, 4).forEach((f, n) => add(`${prefix}.feature.${n}`, f.label, `${f.value.toFixed(3)} · 기여도 ${f.contribution >= 0 ? '+' : ''}${f.contribution.toFixed(3)}`))
     }
   }
+  // Keep a representative of each UNO trigger type even when newer events
+  // have pushed it out of the recent-three window. This enables a factual
+  // comparison between a recorded relay command and an automatic capture.
+  for (const [kind, src] of [['command', 'cmd'], ['automatic', 'auto']] as const) {
+    const item = events.find((candidate) => candidate.e.src === src)
+    if (!item) continue
+    const e = item.e
+    const verdict = item.verdict.kind === 'ANSWERED' || item.verdict.kind === 'WITHHELD'
+      ? `${item.verdict.kind === 'ANSWERED' ? '판정' : '보류'} ${item.verdict.labelKo} · 점수 ${item.verdict.score.toFixed(2)} (확률 아님)`
+      : item.verdict.kind === 'NO_MODEL' ? '분류 모델 없음' : `입력 거부 · ${item.verdict.reasons[0] ?? '사유 없음'}`
+    add(`event.${kind}.summary`, `${kind === 'command' ? '최근 명령 사건' : '최근 자동 감지 사건'} #${e.ev}`, `${e.source === 'MOCK' ? '시뮬레이터' : '실측 Arduino'} · ${new Date(e.receivedAt).toISOString()} · ${e.src === 'cmd' ? `명령 직후 ${e.cmd || '(명령 미기록)'}` : '자동 감지'} · ${verdict} · ${e.i100.length}개 원시 표본 · 채널 ${e.ch.join('')}`)
+  }
   return evidence.slice(0, 32)
 }
 

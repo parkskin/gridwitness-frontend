@@ -21,3 +21,12 @@ test('stale serial telemetry is sent as unavailable rather than a measurement', 
   assert.match(evidence.find((e) => e.id === 'village.status').value, /오래된 계측/)
   assert.match(evidence.find((e) => e.id === 'village.measurement.total').value, /5초 이상/)
 })
+
+test('keeps command and automatic UNO summaries available for event comparison', () => {
+  const snapshot = { ...getVillage(), source: 'SERIAL', connected: false, status: 'NO_DATA', lastPacketAt: null }
+  const event = (src, ev) => ({ e: { ev, receivedAt: `2026-11-10T10:00:0${ev}Z`, source: 'SERIAL', src, cmd: src === 'cmd' ? 'CH 2 0' : '', i100: Array(260).fill(1200), ch: [1, 0, 1, 1, 1] }, verdict: { kind: 'NO_MODEL', reasons: [] } })
+  const events = [event('auto', 9), event('auto', 8), event('auto', 7), event('cmd', 6)]
+  const evidence = buildVillageEvidence(snapshot, events, Date.now())
+  assert.match(evidence.find((e) => e.id === 'village.event.command.summary').value, /명령 직후 CH 2 0/)
+  assert.match(evidence.find((e) => e.id === 'village.event.automatic.summary').value, /자동 감지/)
+})

@@ -9,6 +9,7 @@ import { getVillage, IOT_CHANNELS, STATUS_LABEL } from './village'
 import type { VillageSnapshot } from './village'
 import { DEVICE_INFO, SOURCE_LABEL } from './village'
 import type { AnalyzedEvent } from './villageEvents'
+import { formatModelScore } from './modelScore'
 
 export interface VillageEvidence { id: string; label: string; value: string }
 
@@ -85,7 +86,7 @@ function verdictText(a: AnalyzedEvent): string {
   const source = `${a.e.source === 'MOCK' ? '시뮬레이터' : '실측 Arduino'} · ${new Date(a.e.receivedAt).toLocaleString('ko-KR')}`
   if (v.kind === 'ANSWERED') {
     const why = v.evidence.slice(0, 2).map((e) => e.label).join(', ')
-    return `${source} 사건 #${a.e.ev}은(는) '${v.labelKo}'(으)로 판정했어요. 점수 ${Math.round(v.score * 100)}%, 주요 근거는 ${why}입니다.`
+    return `${source} 사건 #${a.e.ev}은(는) '${v.labelKo}'(으)로 판정했어요. 모델 점수 ${formatModelScore(v.score)} (정답 확률 아님), 주요 근거는 ${why}입니다.`
   }
   if (v.kind === 'WITHHELD') return `${source} 사건 #${a.e.ev}은(는) 판정을 보류했어요. 1순위는 '${v.labelKo}'였지만 ${v.reasons[0] ?? '근거가 부족'}해서요.`
   if (v.kind === 'NO_MODEL') return `${source} 사건 #${a.e.ev}의 파형은 기록했지만, 원인 분류 모델이 아직 학습 전이라 판정하지 않았어요.`

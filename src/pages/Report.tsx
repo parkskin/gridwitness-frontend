@@ -11,6 +11,7 @@ import { inspectionCandidate } from '../lib/gis'
 import { buildIncidentContext, EVIDENCE_GROUP_LABEL, eventKo, type EvidenceGroup } from '../lib/incidentContext'
 import { FI_SHORT, STAGE_LABEL, getLiveIncident, useLiveIncidents, type LiveIncident } from '../lib/liveIncident'
 import { SOURCE_LABEL, type AnyCase, type IncidentCase } from '../types'
+import { formatModelScore } from '../lib/modelScore'
 
 // 사고조사 보고서: 기획서의 출력 형태(구간 → 유형 → 원인 가설 → 점검 목록 → 근거)를 한 장으로.
 // 실시간 사건(마을 직류 계측)과 교류 고장파형 사건 모두 같은 틀. 인쇄·PDF 저장용.
@@ -143,7 +144,7 @@ function CaseBody({ c, notes }: { c: IncidentCase; notes: FieldNote[] }) {
   const ctx = buildIncidentContext(c)
   const a = ctx.analysis
   const groups = Object.entries(ctx.evidence.reduce<Record<string, typeof ctx.evidence>>((acc, e) => ((acc[e.group] ??= []).push(e), acc), {})) as [EvidenceGroup, typeof ctx.evidence][]
-  const verdict = a.status === 'NONE' ? '분석 전' : a.status === 'COMPLETED' ? `${eventKo(a.label!)} · ${a.score != null ? Math.round(a.score * 100) : '—'}%` : '판단 보류'
+  const verdict = a.status === 'NONE' ? '분석 전' : a.status === 'COMPLETED' ? `${eventKo(a.label!)} · 모델 점수 ${formatModelScore(a.score)} (정답 확률 아님)` : '판단 보류'
   return (
     <Frame id={c.id} kind={`교류 고장파형 · ${SOURCE_LABEL[c.source.sourceType]}`} title={c.title}>
       {c.sync?.error && <p className="alert alert-warn">{c.sync.error}</p>}
@@ -156,7 +157,7 @@ function CaseBody({ c, notes }: { c: IncidentCase; notes: FieldNote[] }) {
       </Block>
       <Block no={3} title="고장 유형">
         <p><b>{verdict}</b>{a.type ? ` · ${a.type}` : ''}</p>
-        {a.ranking.length > 0 && <p className="rp-note">유형별 점수: {a.ranking.map((r) => `${r.label} ${r.score.toFixed(2)}`).join(' / ')}</p>}
+        {a.ranking.length > 0 && <p className="rp-note">유형별 모델 점수 (정답 확률 아님): {a.ranking.map((r) => `${r.label} ${r.score.toFixed(2)}`).join(' / ')}</p>}
         {a.reasons.length > 0 && <p>보류·주의 사유: {a.reasons.join(' · ')}</p>}
       </Block>
       <Block no={4} title="원인 가설">

@@ -8,6 +8,7 @@ import { frtuViews, locateFault } from '../lib/frtu'
 import { askAssistantAbout } from '../lib/panels'
 import { API_CHANGED_EVENT } from '../lib/backend'
 import { STAGE_LABEL, useLiveIncidents } from '../lib/liveIncident'
+import { formatModelScore } from '../lib/modelScore'
 import { STATUS_LABEL, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import type { AnyCase, CaseStage, CaseSummary } from '../types'
@@ -47,8 +48,8 @@ function Kpi({ label, value, chip, icon, primary, onClick }: { label: string; va
 
 function verdictOf(a: AnalyzedEvent): { tone: Tone; text: string; score: string } {
   const v = a.verdict
-  if (v.kind === 'ANSWERED') return { tone: v.isFault ? 'err' : 'ok', text: v.labelKo, score: `${Math.round(v.score * 100)}%` }
-  if (v.kind === 'WITHHELD') return { tone: 'warn', text: `보류 (1순위 ${v.labelKo})`, score: `${Math.round(v.score * 100)}%` }
+  if (v.kind === 'ANSWERED') return { tone: v.isFault ? 'err' : 'ok', text: v.labelKo, score: formatModelScore(v.score) }
+  if (v.kind === 'WITHHELD') return { tone: 'warn', text: `보류 (1순위 ${v.labelKo})`, score: formatModelScore(v.score) }
   if (v.kind === 'NO_MODEL') return { tone: 'off', text: '모델 학습 전', score: '—' }
   return { tone: 'err', text: '입력 거부', score: '—' }
 }
@@ -259,7 +260,7 @@ export default function Dashboard() {
             <p className="muted small" style={{ margin: '4px 2px' }}>아직 판정한 마을 사건이 없어요.</p>
           ) : (
             <table className="dash-table">
-              <thead><tr><th>사건</th><th>판정</th><th>판정 주체</th><th className="num">점수</th><th className="num">시각</th></tr></thead>
+              <thead><tr><th>사건</th><th>판정</th><th>판정 주체</th><th className="num">점수 (확률 아님)</th><th className="num">시각</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.key} className="clickable" onClick={() => nav('/frtu')}>

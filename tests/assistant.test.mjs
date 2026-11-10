@@ -65,6 +65,12 @@ test('browser fallback abstains on future predictions and recognizes training-da
   assert.match(groundedAnswer('학습 데이터 어디 거야?', ctx).text, /Xiong/)
 })
 
+test('grounded browser fallback never turns a model score into a probability', () => {
+  const fallback = groundedAnswer('분석 결과 알려줘', ctx)
+  assert.match(fallback.text, /점수는 0\.92.*정답 확률이 아니에요/)
+  assert.doesNotMatch(fallback.text, /92%/)
+})
+
 test('all current village measurements abstain when no data is available', () => {
   for (const question of ['전압 알려줘', '왜 이상이야?', '전류는?', '지금 정상이지?']) {
     const text = answer(question, [])

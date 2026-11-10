@@ -3,6 +3,7 @@
 // LLM이 아니므로 질문 의도를 몇 가지로만 가린다. 서버 대화 API가 붙으면 이 함수는 대체 경로로만 쓰인다.
 
 import { eventKo, type IncidentContext } from './incidentContext'
+import { formatModelScore } from './modelScore'
 
 export type AnswerStatus = 'answered' | 'abstained' | 'refused'
 
@@ -16,7 +17,6 @@ export interface GroundedAnswer {
 }
 
 const has = (t: string, re: RegExp) => re.test(t.replace(/\s+/g, ''))
-const pct = (v: number) => `${Math.round(v * 100)}%`
 const ids = (ctx: IncidentContext, ...groups: string[]) => ctx.evidence.filter((e) => groups.some((g) => e.id.startsWith(g))).map((e) => e.id)
 
 /** 설비를 조작하라는 요청인지 (답하지 않고 거절) */
@@ -53,7 +53,7 @@ function summary(ctx: IncidentContext): GroundedAnswer {
     }
   const last = ctx.reviews[ctx.reviews.length - 1]
   return {
-    text: `AI 분석 결과는 '${eventKo(a.label!)}'이고 점수는 ${a.score != null ? pct(a.score) : '—'}예요.${a.reasons.length ? ` 주의할 점: ${a.reasons.join(', ')}.` : ''} ${last ? `담당자 검토: ${last.reviewer} — ${last.verdict}.` : '아직 담당자 검토 전이라 최종 판단은 아니에요.'}`,
+    text: `AI 분석 결과는 '${eventKo(a.label!)}'이고 모델 점수는 ${a.score != null ? formatModelScore(a.score) : '—'}예요. 이 점수는 정답 확률이 아니에요.${a.reasons.length ? ` 주의할 점: ${a.reasons.join(', ')}.` : ''} ${last ? `담당자 검토: ${last.reviewer} — ${last.verdict}.` : '아직 담당자 검토 전이라 최종 판단은 아니에요.'}`,
     status: 'answered',
     evidenceIds: ids(ctx, 'analysis.type', 'analysis.status', 'analysis.ranking', 'analysis.reason', 'review'),
     abstainReasons: [],

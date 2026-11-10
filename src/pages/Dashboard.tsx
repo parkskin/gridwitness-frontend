@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api'
 import { FaultLocationBox, FrtuStrip } from '../components/AiPanel'
 import { IconAlert, IconArrowRight, IconBrain, IconInbox, IconLive, IconVillage, IconWave } from '../components/Icons'
 import { Badge, ErrorState, TableSkeleton, type Tone } from '../components/ui'
-import { CHART } from '../lib/chart'
 import { frtuViews, locateFault } from '../lib/frtu'
 import { askAssistantAbout } from '../lib/panels'
 import { API_CHANGED_EVENT } from '../lib/backend'
-import { openIncident, STAGE_LABEL, useLiveIncidents } from '../lib/liveIncident'
+import { STAGE_LABEL, useLiveIncidents } from '../lib/liveIncident'
 import { STATUS_LABEL, useVillage } from '../lib/village'
 import { useVillageEvents, type AnalyzedEvent } from '../lib/villageEvents'
 import type { AnyCase, CaseStage, CaseSummary } from '../types'
@@ -102,6 +100,7 @@ function ResponseCard({ cases, full, now }: { cases: CaseSummary[]; full: AnyCas
 /** 오늘 생긴 실시간 사건 (발생 → 처리 단계 → 복구) */
 function TodayIncidents() {
   const { incidents } = useLiveIncidents()
+  const nav = useNavigate()
   const start = new Date()
   start.setHours(0, 0, 0, 0)
   const today = incidents.filter((x) => x.startedAt >= start.getTime())
@@ -118,7 +117,7 @@ function TodayIncidents() {
           {today.slice(0, 6).map((x) => (
             <li key={x.id} className={x.clearedAt ? '' : 'live'}>
               <span className="today-time num">{new Date(x.startedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-              <button type="button" className="today-main" onClick={() => openIncident(x.id)}>
+              <button type="button" className="today-main" onClick={() => nav(`/incidents/${x.recordId}`)}>
                 <strong>{x.title.split(' (')[0]}</strong>
                 <span>{x.clearedAt ? `${Math.round((x.clearedAt - x.startedAt) / 1000)}초 만에 복구` : '진행 중'} · {x.assignee ?? '담당자 미지정'}</span>
               </button>
@@ -204,8 +203,6 @@ export default function Dashboard() {
   const fiCount = Object.values(fv).filter((f) => f.fi !== 'NONE').length
   const loc = locateFault(snap, fv)
   const live = snap.connected && snap.status !== 'NO_DATA'
-  const t0 = snap.history.length ? snap.history[snap.history.length - 1].t : 0
-  const data = snap.history.map((h) => ({ t: (h.t - t0) / 1000, mA: h.i * 1000, house: h.ih != null ? h.ih * 1000 : null, lamp: h.il != null ? h.il * 1000 : null }))
 
   // AI 판정과 규칙 기반 이상을 한 표에 시간순으로
   const rows = [
@@ -242,7 +239,7 @@ export default function Dashboard() {
         <section className="dash-card">
           <div className="dash-card-head">
             <h2>마을 FRTU</h2>
-            <Link to="/frtu" className="pill-link">FRTU 상세 <IconArrowRight /></Link>
+            <Link to="/frtu" className="pill-link">FRTU 파형 분석 <IconArrowRight /></Link>
           </div>
           {!live ? (
             <DeviceConnectCard real={snap.source === 'SERIAL'} reconnecting={snap.reconnecting} />
@@ -250,18 +247,6 @@ export default function Dashboard() {
             <div className="dash-sub">
               <FrtuStrip snap={snap} value="inlet" onPick={(id) => nav(`/frtu${id === 'inlet' ? '' : `?id=${id}`}`)} />
               <FaultLocationBox snap={snap} />
-              <span>실시간 전류 · 인입 / 주택 분기 / 가로등 분기</span>
-              <ResponsiveContainer width="100%" height={120}>
-                <LineChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART.grid} vertical={false} />
-                  <XAxis dataKey="t" type="number" domain={['dataMin', 0]} tick={CHART.tick} axisLine={false} tickLine={false} unit="s" />
-                  <YAxis tick={CHART.tick} axisLine={false} tickLine={false} width={40} domain={['auto', 'auto']} />
-                  <Tooltip formatter={(x) => (typeof x === 'number' ? `${x.toFixed(1)} mA` : x)} labelFormatter={(t) => `${Number(t).toFixed(1)} s`} />
-                  <Line dataKey="mA" name="인입" stroke="#2f6bff" dot={false} strokeWidth={1.8} isAnimationActive={false} />
-                  <Line dataKey="house" name="주택 분기" stroke="#e08a1e" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
-                  <Line dataKey="lamp" name="가로등 분기" stroke="#24835a" dot={false} strokeWidth={1.4} isAnimationActive={false} connectNulls />
-                </LineChart>
-              </ResponsiveContainer>
             </div>
           )}
 

@@ -1,36 +1,24 @@
-import { useState } from 'react'
-import { FI_LABEL, frtuViews, type FrtuId } from '../lib/frtu'
+import { frtuViews } from '../lib/frtu'
 import { buildIncidentContext, EVIDENCE_GROUP_LABEL, eventKo, type EvidenceGroup } from '../lib/incidentContext'
-import { STATUS_LABEL, THRESHOLDS, useVillage } from '../lib/village'
+import { STATUS_LABEL, useVillage } from '../lib/village'
 import type { IncidentCase } from '../types'
-import { FaultLocationBox, FrtuStrip, LiveWave } from './AiPanel'
+import { LiveFrtuWaveAnalysis } from './FrtuWaveAnalysis'
 import { NODE_TONE, Status } from './ui'
 
 /** AI 도우미 전체화면 왼쪽: 마을 FRTU 실시간 계측 (대화하면서 값을 같이 봄) */
 export function VillageLiveSide() {
   const snap = useVillage()
-  const [id, setId] = useState<FrtuId>('inlet')
-  const f = frtuViews(snap)[id]
-  const ratio = f.expected > 0 ? f.i / f.expected : 0
+  const f = frtuViews(snap).inlet
   return (
     <div className="ga-side-inner">
       <div className="ga-side-head">
         <div>
           <span className="ga-side-kicker">실시간 · 0.5초 간격</span>
-          <h2>마을 FRTU</h2>
+          <h2>마을 FRTU 파형 분석</h2>
         </div>
         <Status tone={f.fi !== 'NONE' ? 'err' : NODE_TONE[f.status]} live={f.fi !== 'NONE'}>{STATUS_LABEL[f.status]}</Status>
       </div>
-      <FrtuStrip snap={snap} value={id} onPick={setId} />
-      <div className="ga-stats">
-        <div><span>측정 전류</span><strong className="num">{(f.i * 1000).toFixed(1)}<small> mA</small></strong></div>
-        <div><span>예상 대비</span><strong className="num">{Math.round(ratio * 100)}<small> %</small></strong></div>
-        <div><span>전압</span><strong className="num">{f.v.toFixed(2)}<small> V</small></strong></div>
-        <div><span>이상 점수</span><strong className={`num ${f.score >= THRESHOLDS.fault ? 'err' : f.score >= THRESHOLDS.warn ? 'warn' : ''}`}>{f.score.toFixed(2)}</strong></div>
-      </div>
-      <div className="ga-fi">고장표시 · <b>{FI_LABEL[f.fi]}</b></div>
-      <div className="ga-chart"><LiveWave snap={snap} frtu={id} /></div>
-      <FaultLocationBox snap={snap} />
+      <LiveFrtuWaveAnalysis stacked compact />
     </div>
   )
 }

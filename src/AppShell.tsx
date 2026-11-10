@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { IncidentBanner, IncidentSheet, IncidentWatcher } from './components/LiveIncident'
-import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLive, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
+import { IconAnalysis, IconDashboard, IconShieldCheck, IconDatabase, IconLogo, IconMenu, IconBolt, IconSettings, IconVillage } from './components/Icons'
 import { Dot, PageSkeleton } from './components/ui'
 import { useActor } from './lib/actor'
 import { monitorBackend, useBackendHealth } from './lib/backend'
@@ -14,6 +14,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const FieldAssistant = lazy(() => import('./pages/FieldAssistant'))
 const FrtuDetail = lazy(() => import('./pages/FrtuDetail'))
 const Admin = lazy(() => import('./pages/Admin'))
+const IncidentDetail = lazy(() => import('./pages/IncidentDetail'))
 const LiveData = lazy(() => import('./pages/LiveData'))
 const NewCase = lazy(() => import('./pages/NewCase'))
 const PublicData = lazy(() => import('./pages/PublicData'))
@@ -30,7 +31,6 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
     items: [
       { to: '/dashboard', label: '대시보드', icon: <IconDashboard /> },
       { to: '/village', label: '마을 시뮬레이션', icon: <IconVillage /> },
-      { to: '/frtu', label: 'FRTU 상세', icon: <IconLive /> },
       { to: '/city', label: '도시 시뮬레이션', icon: <IconBolt /> },
     ],
   },
@@ -54,7 +54,6 @@ const NAV: { label: string; items: { to: string; label: string; icon: ReactNode;
 const TOP_NAV = [
   { to: '/dashboard', label: '대시보드' },
   { to: '/village', label: '3D 마을' },
-  { to: '/frtu', label: 'FRTU' },
   { to: '/cases', label: '사건 기록' },
   { to: '/public-data', label: '공공데이터' },
   { to: '/city', label: '도시' },
@@ -222,6 +221,7 @@ export function Shell({ extraRoutes }: { extraRoutes?: ReactNode } = {}) {
               <Route path="/village/loads" element={<VillageLoads />} />
               <Route path="/live" element={<LiveData />} />
               <Route path="/frtu" element={<FrtuDetail />} />
+              <Route path="/incidents/:id" element={<IncidentDetail />} />
               <Route path="/city" element={<City />} />
               <Route path="/cases" element={<CaseList />} />
               <Route path="/cases/new" element={<NewCase />} />

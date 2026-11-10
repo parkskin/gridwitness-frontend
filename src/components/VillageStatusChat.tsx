@@ -30,7 +30,8 @@ export default function VillageStatusChat() {
   const [listening, setListening] = useState(false)
   const [fromVoice, setFromVoice] = useState(false)
   const [micMsg, setMicMsg] = useState<string | null>(RecCtor ? null : '이 브라우저는 음성 인식을 지원하지 않아요. 글로 질문해 주세요.')
-  const [voiceReply, setVoiceReply] = useState(false)
+  // 답변은 기본으로 소리로 읽음 (현장에서 화면을 안 봐도 되게). 끄면 글로만
+  const [voiceReply, setVoiceReply] = useState(true)
   const rec = useRef<Rec | null>(null)
   const end = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -49,6 +50,9 @@ export default function VillageStatusChat() {
     setMicMsg(null)
     if (viaVoice || voiceReply) speak(a)
   }
+  // 음성 인식이 끝났을 때 최신 send를 부르기 위함 (마이크를 켠 시점의 오래된 값을 쓰지 않게)
+  const sendRef = useRef(send)
+  sendRef.current = send
 
   function toggleMic() {
     if (!RecCtor) return
@@ -69,11 +73,8 @@ export default function VillageStatusChat() {
     }
     r.onend = () => {
       setListening(false)
-      if (finalText.trim()) {
-        setFromVoice(true)
-        setMicMsg('인식한 문장을 확인하고, 고칠 곳이 있으면 고친 뒤 보내세요.')
-        inputRef.current?.focus()
-      }
+      // 말이 끝나면 인식한 문장을 바로 보냄
+      if (finalText.trim()) sendRef.current(finalText, true)
     }
     r.onerror = (e) => { setListening(false); setMicMsg(MIC_ERROR[e.error] ?? '음성을 알아듣지 못했어요. 글로 질문해 주세요.') }
     rec.current = r

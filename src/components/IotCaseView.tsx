@@ -1,3 +1,4 @@
+import { ApprovalBadge } from './ApprovalPanel'
 import { useState } from 'react'
 import { api } from '../api'
 import { getVillageRecordState, retryVillageRecords, useVillagePersistence } from '../api/village'
@@ -6,8 +7,10 @@ import { CHART } from '../lib/chart'
 import { fmtTime } from '../lib/actor'
 import { STATUS_LABEL, THRESHOLDS } from '../lib/village'
 import type { AnyCase, IotCase } from '../types'
-import { DiagnosisBadge, StageBadge, Steps } from './Badges'
+import { DiagnosisBadge, Steps } from './Badges'
+import FrtuWaveAnalysis, { similarOf, verdictInfo } from './FrtuWaveAnalysis'
 import IssueList from './IssueList'
+import { useVillageEvents } from '../lib/villageEvents'
 import ReviewPanel from './ReviewPanel'
 import { Badge, Metric, Metrics, NODE_TONE, PageHeader, Section, Status } from './ui'
 
@@ -21,6 +24,11 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
   const [syncError, setSyncError] = useState<string | null>(null)
   const stored = getVillageRecordState(c.id)
   const d = c.detection
+  // 이 사건 기록 구간(앞뒤 5초 포함)에 장치가 보낸 사건 녹화가 있으면 그 AI 판정을 같이 보여 줌
+  const events = useVillageEvents()
+  const from = (c.window[0]?.t ?? 0) - 5000
+  const to = (c.window[c.window.length - 1]?.t ?? 0) + 5000
+  const matched = events.find((a) => { const t = Date.parse(a.e.receivedAt); return t >= from && t <= to })
   const t0 = c.window[0]?.t ?? 0
   const data = c.window.map((p) => ({
     s: +((p.t - t0) / 1000).toFixed(1),
@@ -41,7 +49,7 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
             <span className="mono">{c.id}</span>
             <Badge outline>IoT 이상 이벤트</Badge>
             <DiagnosisBadge status={c.diagnosis.status} />
-            <StageBadge stage={c.stage} />
+            <ApprovalBadge c={c} />
             <span className="num">{fmtTime(c.createdAt)}</span>
           </>
         }
@@ -60,32 +68,15 @@ export default function IotCaseView({ c, onChange }: { c: IotCase; onChange: (c:
       <div key={tab} className="tab-panel">
         {tab === 'record' && (
           <>
-            <Section title="예상 전류와 실제 전류" description={`${c.device.scope} · 릴레이 ${c.device.relayOn ? '켜짐' : '차단'} 상태에서 예상 ${c.device.expectedA.toFixed(2)} A`}>
-              <div className="legend" style={{ marginBottom: 8 }}>
-                <span><i style={{ background: CHART.ink }} />실제 전류</span>
-                <span style={{ color: CHART.secondary }}><i className="dash" />예상 전류</span>
-              </div>
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART.grid} vertical={false} />
-                  <XAxis dataKey="s" unit="s" type="number" domain={['dataMin', 'dataMax']} {...axis} />
-                  <YAxis unit="A" {...axis} width={52} />
-                  <Tooltip />
-                  <Line name="실제 전류" dataKey="i" stroke={CHART.ink} dot={false} strokeWidth={1.75} isAnimationActive={false} />
-                  <Line name="예상 전류" dataKey="expected" stroke={CHART.secondary} strokeDasharray="4 4" dot={false} strokeWidth={1.5} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </Section>
-            <Section title="전압">
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                  <CartesianGrid stroke={CHART.grid} vertical={false} />
-                  <XAxis dataKey="s" unit="s" type="number" domain={['dataMin', 'dataMax']} {...axis} />
-                  <YAxis unit="V" domain={[0, 13]} {...axis} width={52} />
-                  <Tooltip />
-                  <Line name="전압" dataKey="v" stroke={CHART.ink} dot={false} strokeWidth={1.75} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
+            <Section title="FRTU 파형 분석" description={`${c.device.scope} · 릴레이 ${c.device.relayOn ? '켜짐' : '차단'} 상태에서 예상 ${c.device.expectedA.toFixed(2)} A`}>
+              <FrtuWaveAnalysis
+                points={c.window}
+                sourceText={c.device.sensor}
+                verdict={verdictInfo(matched)}
+                similar={similarOf(events, matched)}
+                rule={{ label: `${STATUS_LABEL[d.status]} · 최대 이상 점수 ${d.maxScore.toFixed(2)}`, lines: d.findings }}
+                onReview={() => setTab('review')}
+              />
             </Section>
             <div className="grid-2 section">
               <Section title="장치">

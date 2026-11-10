@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '../api'
 import { fmtTime, getActor } from '../lib/actor'
+import { approvalLog, approvalStatus, noteReviewAdded, useApprovals } from '../lib/approval'
+import ApprovalPanel from './ApprovalPanel'
 import { VERDICT_LABEL, type AnyCase, type Review } from '../types'
 import { Badge, Section, Segmented } from './ui'
 
@@ -15,13 +17,20 @@ export default function ReviewPanel({ c, aiSummary, onChange, locked }: { c: Any
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const latest = c.reviews[c.reviews.length - 1]
+  const approvals = useApprovals()
+  // 확정된 사건은 검토를 더 받지 않음 (재검토 요청으로 다시 열어야 함)
+  const lockedByApproval = approvalStatus(c, approvalLog(approvals, c.id)) === 'APPROVED'
+    ? '최종 승인으로 확정된 사건이라 검토를 추가할 수 없어요. 고쳐야 하면 아래 최종 승인에서 재검토를 요청해 주세요.'
+    : null
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      onChange(await api.submitReview(c.id, { reviewer: getActor(), verdict, finalJudgment, additionalInvestigation }))
+      const reviewer = getActor()
+      onChange(await api.submitReview(c.id, { reviewer, verdict, finalJudgment, additionalInvestigation }))
+      noteReviewAdded(c.id, reviewer)
       setFinal('')
       setInv('')
       setSaved(true)
@@ -53,13 +62,14 @@ export default function ReviewPanel({ c, aiSummary, onChange, locked }: { c: Any
         </div>
         <div>
           <h3>최종 판단 · 사람</h3>
-          {latest?.finalJudgment ? <span>{latest.finalJudgment}</span> : <span className="muted">미확정</span>}
+          {latest?.finalJudgment ? <span>{latest.finalJudgment}</span> : <span className="muted">아직 없음</span>}
+          <div className="xs muted" style={{ marginTop: 4 }}>최종 승인 전에는 확정이 아니에요</div>
         </div>
       </div>
 
-      {locked ? (
+      {locked || lockedByApproval ? (
         <Section title="검토 기록 추가">
-          <div className="alert alert-warn" style={{ margin: 0 }}><span>{locked}</span></div>
+          <div className="alert alert-warn" style={{ margin: 0 }}><span>{locked ?? lockedByApproval}</span></div>
         </Section>
       ) : (
         <Section title="검토 기록 추가" description="AI 결과는 바뀌지 않고, 사람의 판단이 별도로 쌓입니다.">
@@ -84,6 +94,8 @@ export default function ReviewPanel({ c, aiSummary, onChange, locked }: { c: Any
           </form>
         </Section>
       )}
+
+      <ApprovalPanel c={c} />
 
       <Section title="실행 이력" description="원본 등록부터 검토까지 이 사건에서 일어난 일">
         <ol className="timeline">

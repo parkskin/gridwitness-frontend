@@ -31,7 +31,7 @@ interface Props {
 }
 
 /** 한 종류의 파형(전압·전류·영상전류)을 그리는 칸 */
-function Strip({ title, unit, keys, colors, data, onset, recovery, height, first, last }: { title: string; unit: string; keys: string[]; colors: string[]; data: Record<string, number>[]; onset: number | null; recovery: number | null; height: number; first?: boolean; last?: boolean }) {
+export function Strip({ title, unit, keys, colors, data, onset, recovery, height, first, last }: { title: string; unit: string; keys: string[]; colors: string[]; data: Record<string, number | null>[]; onset: number | null; recovery: number | null; height: number; first?: boolean; last?: boolean }) {
   return (
     <div className="fa-strip">
       <div className="fa-strip-head">
@@ -67,7 +67,7 @@ function Strip({ title, unit, keys, colors, data, onset, recovery, height, first
   )
 }
 
-function Evidence({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+export function Evidence({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
     <div className="fa-ev">
       <div className="fa-ev-label">{icon}{label}</div>

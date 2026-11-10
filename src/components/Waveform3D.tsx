@@ -29,11 +29,13 @@ function Playhead({ playing, onPos }: { playing: boolean; onPos: (x: number) => 
   )
 }
 
-export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz, onsetSample, recoverySeconds }: { matrix: number[][]; samplingRateHz: number; systemFrequencyHz: number; onsetSample?: number | null; recoverySeconds?: number | null }) {
+/** channelNames·channelColors를 주면 교류 3상이 아닌 계측(예: 마을 FRTU 직류 전류)도 같은 3D로 그림 */
+export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz, onsetSample, recoverySeconds, channelNames, channelColors }: { matrix: number[][]; samplingRateHz: number; systemFrequencyHz: number; onsetSample?: number | null; recoverySeconds?: number | null; channelNames?: string[]; channelColors?: string[] }) {
   const [playing, setPlaying] = useState(true)
   const cursorRef = useRef<HTMLSpanElement>(null)
   const durationMs = (matrix.length / samplingRateHz) * 1000
-  const channels = channelsFor(matrix[0]?.length ?? 0)
+  const channels: readonly string[] = channelNames ?? channelsFor(matrix[0]?.length ?? 0)
+  const colorOf = (c: string, j: number) => channelColors?.[j] ?? COLORS[c as keyof typeof COLORS] ?? '#b8c4d4'
 
   const lines = useMemo(() => {
     const m = preprocess(matrix)
@@ -44,9 +46,9 @@ export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz, 
       for (let i = 0; i < m.length; i += step) {
         pts.push([(i / (m.length - 1) - 0.5) * X_SPAN, m[i][j] * Y_SCALE, z])
       }
-      return { c, z, pts }
+      return { c, z, pts, color: colorOf(c, j) }
     })
-  }, [matrix, channels])
+  }, [matrix, channels, channelColors])
 
   const markers = useMemo(() => analyzeWaveform(matrix, samplingRateHz, systemFrequencyHz), [matrix, samplingRateHz, systemFrequencyHz])
   const change = onsetSample === undefined ? markers.onset?.sample ?? null : onsetSample
@@ -75,11 +77,11 @@ export default function Waveform3D({ matrix, samplingRateHz, systemFrequencyHz, 
           fadeDistance={40}
           infiniteGrid={false}
         />
-        {lines.map(({ c, z, pts }) => (
+        {lines.map(({ c, z, pts, color }) => (
           <group key={c}>
-            <Line points={pts} color={COLORS[c]} lineWidth={1.6} />
+            <Line points={pts} color={color} lineWidth={1.6} />
             <Line points={[[-X_SPAN / 2, 0, z], [X_SPAN / 2, 0, z]]} color="#2c4562" lineWidth={0.6} />
-            <Label lines={[c]} position={[-X_SPAN / 2 - 0.5, 0, z]} color={COLORS[c]} lineHeight={0.3} />
+            <Label lines={[c]} position={[-X_SPAN / 2 - 0.5, 0, z]} color={color} lineHeight={0.3} />
           </group>
         ))}
         {changeX != null && (

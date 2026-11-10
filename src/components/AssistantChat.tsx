@@ -109,7 +109,8 @@ function AssistantConversation({ c, variant = 'panel' }: AssistantChatProps) {
   const [fromVoice, setFromVoice] = useState(false)
   const [listening, setListening] = useState(false)
   const [micMsg, setMicMsg] = useState<string | null>(RecCtor ? null : '이 브라우저는 음성 인식을 지원하지 않아요. 글로 질문해 주세요.')
-  const [voiceReply, setVoiceReply] = useState(variant === 'field')
+  // 답변은 기본으로 소리로 읽음 (현장에서 화면을 안 봐도 되게). 끄면 글로만
+  const [voiceReply, setVoiceReply] = useState(true)
   const rec = useRef<Rec | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const end = useRef<HTMLDivElement>(null)
@@ -134,10 +135,10 @@ function AssistantConversation({ c, variant = 'panel' }: AssistantChatProps) {
     end.current?.scrollIntoView({ block: 'end' })
   }, [turns, pending])
 
-  async function send(text: string) {
+  async function send(text: string, viaVoice = fromVoice) {
     const q = text.trim()
     if (!q || pending) return
-    const via = fromVoice ? 'voice' : 'text'
+    const via = viaVoice ? 'voice' : 'text'
     setInput('')
     setFromVoice(false)
     setMicMsg(null)
@@ -162,6 +163,10 @@ function AssistantConversation({ c, variant = 'panel' }: AssistantChatProps) {
     }
   }
 
+  // 음성 인식이 끝났을 때 최신 send를 부르기 위함 (마이크를 켠 시점의 오래된 대화를 쓰지 않게)
+  const sendRef = useRef(send)
+  sendRef.current = send
+
   function toggleMic() {
     if (!RecCtor) return
     if (listening) return rec.current?.stop()
@@ -183,12 +188,8 @@ function AssistantConversation({ c, variant = 'panel' }: AssistantChatProps) {
     r.onerror = (e) => setMicMsg(MIC_ERROR[e.error] ?? '음성을 알아듣지 못했어요. 글로 질문해 주세요.')
     r.onend = () => {
       setListening(false)
-      // 인식한 문장을 바로 보내지 않고 입력창에 두어 고칠 수 있게 함
-      if (finalText.trim()) {
-        setFromVoice(true)
-        setMicMsg('인식한 문장을 확인하고, 고칠 곳이 있으면 고친 뒤 보내세요.')
-        inputRef.current?.focus()
-      }
+      // 말이 끝나면 인식한 문장을 바로 보냄
+      if (finalText.trim()) void sendRef.current(finalText, true)
     }
     rec.current = r
     if (canSpeak) window.speechSynthesis.cancel()

@@ -1,9 +1,10 @@
+import { ApprovalBadge } from '../components/ApprovalPanel'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api'
 import AssistantChat from '../components/AssistantChat'
 import FieldNotes from '../components/FieldNotes'
-import { DiagnosisBadge, StageBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
+import { DiagnosisBadge, Steps, WAVEFORM_STEPS, waveformStepsDone } from '../components/Badges'
 import FaultAnalysis from '../components/FaultAnalysis'
 import IotCaseView from '../components/IotCaseView'
 import IssueList from '../components/IssueList'
@@ -58,7 +59,7 @@ export function WaveformCaseView({ c, onChange }: { c: IncidentCase; onChange: (
           <>
             <span className="mono">{c.id}</span>
             <DiagnosisBadge status={c.diagnosis.status} />
-            <StageBadge stage={c.stage} />
+            <ApprovalBadge c={c} />
             <span>{SOURCE_LABEL[c.source.sourceType]}</span>
             <span className="num">{fmtTime(c.createdAt)}</span>
           </>

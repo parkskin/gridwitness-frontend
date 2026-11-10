@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AiPanel from '../components/AiPanel'
 import Channels from '../components/Channels'
 import EventList from '../components/EventList'
@@ -9,7 +9,7 @@ import SceneBoundary from '../components/SceneBoundary'
 import Sparkline from '../components/Sparkline'
 import { Badge, NODE_TONE, Section, Segmented, Status } from '../components/ui'
 import VillageScene from '../components/village/VillageScene'
-import { LiveAnalysis } from './LiveData'
+import { LiveFrtuWaveAnalysis } from '../components/FrtuWaveAnalysis'
 import { isFrtuId, type FrtuId } from '../lib/frtu'
 import { announcePanelOpen, ASSISTANT_OPEN_EVENT, INCIDENT_OPEN_EVENT } from '../lib/panels'
 import { NET_COLOR, NET_KIND_LABEL, type NetKind, type PartId } from '../lib/hardware'
@@ -105,8 +105,7 @@ export default function Village() {
   const [params] = useSearchParams()
   const [frtu, setFrtu] = useState<FrtuId | null>(() => (isFrtuId(params.get('frtu')) ? (params.get('frtu') as FrtuId) : params.get('ai') === '1' ? 'inlet' : null))
   const [controls, setControls] = useState(false)
-  const liveDlg = useRef<HTMLDialogElement>(null)
-  const [liveOpen, setLiveOpen] = useState(false)
+  const nav = useNavigate()
   // AI 도우미가 열리면 화면의 카드 패널(FRTU 요약·제어판·LED 상세)은 내려감
   useEffect(() => {
     const onAssistant = () => {
@@ -332,8 +331,8 @@ export default function Village() {
         </div>
       </Section>
 
-          <Section title="실시간 분석" actions={<button type="button" className="btn btn-sm" onClick={() => { setLiveOpen(true); liveDlg.current?.showModal() }}>크게 보기</button>}>
-            <LiveAnalysis compact />
+          <Section title="FRTU 파형 분석" actions={<button type="button" className="btn btn-sm" onClick={() => nav('/frtu')}>크게 보기</button>}>
+            <LiveFrtuWaveAnalysis stacked compact />
           </Section>
 
           <Section title="이상 이벤트" actions={<Link to="/village/loads" className="small">부하(LED 5개) 현황 →</Link>}>
@@ -342,14 +341,6 @@ export default function Village() {
 
         </aside>
       )}
-      {/* 페이지를 떠나지 않고 실시간 분석 전체를 팝업으로 (ESC·바깥 클릭으로 닫힘) */}
-      <dialog ref={liveDlg} className="live-dialog" aria-label="실시간 분석" onClose={() => setLiveOpen(false)} onClick={(e) => { if (e.target === e.currentTarget) liveDlg.current?.close() }}>
-        <div className="ai-head">
-          <strong>실시간 분석</strong>
-          <button className="btn btn-ghost btn-icon" onClick={() => liveDlg.current?.close()} aria-label="닫기"><IconX /></button>
-        </div>
-        {liveOpen && <LiveAnalysis />}
-      </dialog>
       </div>
     </div>
   )

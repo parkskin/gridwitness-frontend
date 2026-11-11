@@ -20,8 +20,8 @@ export default function AiEvidence({ ai, compact }: { ai: AiDetail; compact?: bo
         <>
           <div className="small muted" style={{ marginBottom: 6 }}>{ai.modelCountry ? `${ai.modelCountry} 모델 ` : ''}서버에서 받은 판단 기준</div>
           <div className="gauges">
-            <Gauge label="1순위 점수" note="충분히 뚜렷한가" value={ai.topScore ?? 0} limit={th.score} />
-            {th.margin != null && ai.margin != null && <Gauge label="1·2위 점수 차" note="두 유형을 가를 수 있는가" value={ai.margin} limit={th.margin} max={Math.max(0.5, th.margin * 2)} />}
+            <Gauge label="AI 원인 후보 1위 점수" note="최종 원인으로 표시할 최소 점수" value={ai.topScore ?? 0} limit={th.score} />
+            {th.margin != null && ai.margin != null && <Gauge label="AI 1·2위 후보 점수 차" note="두 원인 후보를 구분하는 최소 차이" value={ai.margin} limit={th.margin} max={Math.max(0.5, th.margin * 2)} />}
             {th.ood_ratio != null && ai.oodRatio != null && <Gauge label="학습 범위 밖 특징" note="배운 적 있는 파형인가" value={ai.oodRatio} limit={th.ood_ratio} higherIsBetter={false} fmt={(x) => `${Math.round(x * 100)}%`} />}
           </div>
           <p className="hint">점수는 정답 확률이 아니에요. 세 기준을 모두 넘어야 결론을 내고, 하나라도 못 넘으면 보류해요.</p>

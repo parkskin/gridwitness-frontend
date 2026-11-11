@@ -790,7 +790,7 @@ function onSerialLine(line: string) {
     return
   }
   // 스케치 v3.1 의 사건 파형 (사건이 날 때만 옴): 원인 분석으로 넘긴다
-  if (line.startsWith('{"ev"')) {
+  if (line.trimStart().startsWith('{')) {
     const ev = parseEventLine(line)
     if (ev) {
       pushVillageEvent({ ...ev, sensorScope: measurementScope })
@@ -804,9 +804,9 @@ function onSerialLine(line: string) {
           }
         })
       }
-    } else badFrames++
-    emit()
-    return
+      emit()
+      return
+    }
   }
   const frame = parseFrame(line)
   if (!frame) {

@@ -75,11 +75,14 @@ export const FEATURE_KO: Record<string, string> = {
 }
 
 export function parseEventLine(line: string): VillageEvent | null {
-  if (!line.startsWith('{"ev"')) return null
   try {
-    const o = JSON.parse(line) as Record<string, unknown>
+    // Serial monitors and some firmware versions can add leading whitespace or
+    // emit the JSON keys in a different order. Parse the frame before deciding
+    // whether it is an event so those captures are not silently discarded.
+    const o = JSON.parse(line.trim()) as Record<string, unknown>
+    if (!o || typeof o !== 'object' || !('ev' in o)) return null
     const i = o.i
-    if (!Array.isArray(i)) return null
+    if (!Array.isArray(i) || !Number.isFinite(Number(o.ev))) return null
     return {
       ev: Number(o.ev),
       dtMs: Number(o.dt),
@@ -235,7 +238,17 @@ export interface AnalyzedEvent {
   e: VillageEvent
   verdict: EventVerdict
 }
-const readCached = () => getCachedVillageRecords<AnalyzedEvent>('event').map((r) => ({ ...r.data, recordId: r.record_id }))
+const readCached = () => getCachedVillageRecords<AnalyzedEvent>('event').map((r) => {
+  const data = r.data
+  const e = data?.e
+  return {
+    ...data,
+    recordId: r.record_id,
+    // Older records may predate persisted verdicts. Re-run the bundled model
+    // so the event remains visible with a result (or an explicit reason).
+    verdict: data?.verdict ?? (e ? analyzeEvent(e) : undefined),
+  }
+})
   .filter((a) => a.e && Array.isArray(a.e.i100) && a.verdict)
   .sort((a, b) => b.e.receivedAt.localeCompare(a.e.receivedAt))
 let recent: AnalyzedEvent[] = readCached()

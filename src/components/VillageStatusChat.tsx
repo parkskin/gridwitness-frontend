@@ -42,7 +42,9 @@ function includeFrtuStatus(question: string, text: string, snapshot: ReturnType<
     if (position < 0) return false
     const detail = text.slice(position, position + 180)
     return views[id].available
-      ? /\d+(?:\.\d+)?\s*V\b/.test(detail) && /\d+(?:\.\d+)?\s*mA\b/.test(detail)
+      ? /\d+(?:\.\d+)?\s*V\b/.test(detail) &&
+        /\d+(?:\.\d+)?\s*mA\b/.test(detail) &&
+        (detail.includes(STATUS_LABEL[views[id].status]) || detail.includes(FI_LABEL[views[id].fi]))
       : /측정 불가|계측값 없음|미측정/.test(detail)
   })
   if (alreadyHasFrtuDetails) return text

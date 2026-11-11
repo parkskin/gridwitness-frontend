@@ -98,10 +98,9 @@ export default function VillageStatusChat() {
 
   return (
     <div className="chat">
-      <div className="chat-scope small muted">마을 직류 계측 · {snapshot.source === 'MOCK' ? '시뮬레이터' : '실측 Arduino'} · 서버 LLM 근거 확인</div>
       <div className="chat-log" aria-live="polite">
         {msgs.map((m, k) => <div key={k} className={`chat-msg ${m.role}`}>{m.text}</div>)}
-        {pending && <div className="chat-msg bot" role="status">서버 LLM이 계측·사건 근거를 확인하고 있어요…</div>}
+        {pending && <div className="chat-msg bot" role="status">답변을 준비하고 있어요…</div>}
         {listening && <div className="chat-msg user listening">듣는 중…</div>}
         <div ref={end} />
       </div>

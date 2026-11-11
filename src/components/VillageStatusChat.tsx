@@ -36,8 +36,16 @@ function cleanReply(text: string) {
 
 function includeFrtuStatus(question: string, text: string, snapshot: ReturnType<typeof useVillage>) {
   if (!/(frtu|분기|전압|전류|상태|현황|문제|이상|고장)/i.test(question)) return text
-  if (/(?:FRTU\s*[-:·]?\s*(?:인입|주택|가로등)|인입 FRTU|주택 분기|가로등 분기)/i.test(text)) return text
   const views = frtuViews(snapshot)
+  const alreadyHasFrtuDetails = FRTUS.every(({ id, name }) => {
+    const position = text.indexOf(name)
+    if (position < 0) return false
+    const detail = text.slice(position, position + 180)
+    return views[id].available
+      ? /\d+(?:\.\d+)?\s*V\b/.test(detail) && /\d+(?:\.\d+)?\s*mA\b/.test(detail)
+      : /측정 불가|계측값 없음|미측정/.test(detail)
+  })
+  if (alreadyHasFrtuDetails) return text
   const lines = FRTUS.map(({ id, name }) => {
     const value = views[id]
     return value.available

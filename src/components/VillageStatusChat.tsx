@@ -54,16 +54,11 @@ export default function VillageStatusChat() {
     setPending(true)
     try {
       const reply = await askVillageAssistant(q, snapshot, events, villageChatHistory(msgs))
-      const badge = reply.mode === 'llm' ? `서버 LLM${reply.model ? ` · ${reply.model}` : ''}` : '서버 규칙 답변'
-      const text = `${reply.text}\n[${badge}]`
-      setMsgs((m) => [...m, { role: 'bot', text }])
+      setMsgs((m) => [...m, { role: 'bot', text: reply.text }])
       if (viaVoice || voiceReply) speak(reply.text)
-    } catch (error) {
+    } catch {
       const fallback = answer(q, events)
-      const reason = (error as Error).message || '서버 LLM 연결 실패'
-      const text = `${fallback}\n[브라우저 규칙 답변 · ${reason}]`
-      setMsgs((m) => [...m, { role: 'bot', text }])
-      setMicMsg(`서버 LLM을 사용하지 못해 브라우저 규칙 답변을 표시했어요. ${reason}`)
+      setMsgs((m) => [...m, { role: 'bot', text: fallback }])
       if (viaVoice || voiceReply) speak(fallback)
     } finally { setPending(false) }
   }

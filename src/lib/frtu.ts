@@ -161,6 +161,12 @@ export function locateFault(s: VillageSnapshot, views = frtuViews(s)): FaultLoca
   if (s.source === 'SERIAL' && s.measurementScope === 'HOUSE' && house.available) {
     if (!s.relay && house.status === 'OFF') return { scope: 'OFF', title: '마을 릴레이가 차단된 상태예요. 주택 분기 고장 여부는 판정하지 않아요.', reasons: [frtuReason(house)], frtus: ['house'] }
     if (house.fi === 'NONE') return { scope: 'NONE', title: '주택 분기 실측에서 기준 이탈이 감지되지 않았어요', reasons: [frtuReason(house), '가로등과 인입은 측정하지 않았어요.'], frtus: ['house'] }
+    if (house.fi === 'VOLTAGE') return {
+      scope: 'UNKNOWN',
+      title: '전압 저하가 감지됐어요 · 원인 위치 미확정',
+      reasons: [`측정 전압 ${house.v.toFixed(2)} V · 전류 ${mA(house.i)} / 예상 ${mA(house.expected)}`, '확인된 센서만으로는 원인 구간을 특정할 수 없어요.'],
+      frtus: ['house'],
+    }
     return { scope: 'HOUSE', title: `주택 분기 실측에서 이상이 감지됐어요 (${FI_LABEL[house.fi]})`, reasons: [frtuReason(house), '가로등과 인입은 측정하지 않았으므로 판정 대상이 아닙니다.'], frtus: ['house'] }
   }
   if (s.source === 'SERIAL' && s.measurementScope !== 'BOTH' && !house.available) return { scope: 'NO_DATA', title: '확인된 주택 분기 실측값이 없어요', reasons: [lamp.unavailableReason ?? inlet.unavailableReason ?? '센서 범위를 확인할 수 없습니다.'], frtus: [] }

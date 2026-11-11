@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { answer, SUGGESTIONS, villageChatHistory, type ChatMsg } from '../lib/assistant'
+import { FI_LABEL, FRTUS, frtuViews } from '../lib/frtu'
+import { STATUS_LABEL } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
 import { useVillage } from '../lib/village'
 import { askVillageAssistant } from '../api/villageAssistant'
@@ -32,6 +34,19 @@ function cleanReply(text: string) {
     .trim()
 }
 
+function includeFrtuStatus(question: string, text: string, snapshot: ReturnType<typeof useVillage>) {
+  if (!/(frtu|분기|전압|전류|상태|현황|문제|이상|고장)/i.test(question)) return text
+  if (/(?:FRTU\s*[-:·]?\s*(?:인입|주택|가로등)|인입 FRTU|주택 분기|가로등 분기)/i.test(text)) return text
+  const views = frtuViews(snapshot)
+  const lines = FRTUS.map(({ id, name }) => {
+    const value = views[id]
+    return value.available
+      ? `${name}: ${STATUS_LABEL[value.status]} · FI ${FI_LABEL[value.fi]} · ${value.v.toFixed(2)} V · 측정 ${(value.i * 1000).toFixed(1)} mA · 예상 ${(value.expected * 1000).toFixed(1)} mA`
+      : `${name}: 계측값 없음`
+  })
+  return `${text}\n\nFRTU 현황\n${lines.join('\n')}`.trim()
+}
+
 /** FRTU(마을 모형) 상태 조회 도우미: 글이나 음성으로 묻고 값을 듣는다. 장치는 조작하지 않음 */
 export default function VillageStatusChat() {
   const events = useVillageEvents()
@@ -62,11 +77,11 @@ export default function VillageStatusChat() {
     setPending(true)
     try {
       const reply = await askVillageAssistant(q, snapshot, events, villageChatHistory(msgs))
-      const clean = cleanReply(reply.text)
+      const clean = includeFrtuStatus(q, cleanReply(reply.text), snapshot)
       setMsgs((m) => [...m, { role: 'bot', text: clean }])
       if (viaVoice || voiceReply) speak(clean)
     } catch {
-      const fallback = cleanReply(answer(q, events))
+      const fallback = includeFrtuStatus(q, cleanReply(answer(q, events)), snapshot)
       setMsgs((m) => [...m, { role: 'bot', text: fallback }])
       if (viaVoice || voiceReply) speak(fallback)
     } finally { setPending(false) }

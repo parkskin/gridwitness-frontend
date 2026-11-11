@@ -167,7 +167,7 @@ export function locateFault(s: VillageSnapshot, views = frtuViews(s)): FaultLoca
       reasons: [`측정 전압 ${house.v.toFixed(2)} V · 전류 ${mA(house.i)} / 예상 ${mA(house.expected)}`, '확인된 센서만으로는 원인 구간을 특정할 수 없어요.'],
       frtus: ['house'],
     }
-    return { scope: 'HOUSE', title: `주택 분기 실측에서 이상이 감지됐어요 (${FI_LABEL[house.fi]})`, reasons: [frtuReason(house), '가로등과 인입은 측정하지 않았으므로 판정 대상이 아닙니다.'], frtus: ['house'] }
+    return { scope: 'HOUSE', title: `주택 분기 실측에서 이상이 감지됐어요 (${FI_LABEL[house.fi]})`, reasons: [frtuReason(house)], frtus: ['house'] }
   }
   if (s.source === 'SERIAL' && s.measurementScope !== 'BOTH' && !house.available) return { scope: 'NO_DATA', title: '확인된 주택 분기 실측값이 없어요', reasons: [lamp.unavailableReason ?? inlet.unavailableReason ?? '센서 범위를 확인할 수 없습니다.'], frtus: [] }
   if (!inlet.available) return { scope: 'NO_DATA', title: '계측값이 없어 고장 구간을 판단할 수 없어요', reasons: [inlet.unavailableReason ?? ''], frtus: [] }

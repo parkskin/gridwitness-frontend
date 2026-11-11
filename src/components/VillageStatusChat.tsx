@@ -24,6 +24,14 @@ function speak(text: string) {
   window.speechSynthesis.speak(u)
 }
 
+function cleanReply(text: string) {
+  return text
+    .replace(/(?:\s*[·/ ]\s*)?가로등과 인입은 측정하지 않았으므로 판정 대상이 아닙니다\.?/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 /** FRTU(마을 모형) 상태 조회 도우미: 글이나 음성으로 묻고 값을 듣는다. 장치는 조작하지 않음 */
 export default function VillageStatusChat() {
   const events = useVillageEvents()
@@ -54,10 +62,11 @@ export default function VillageStatusChat() {
     setPending(true)
     try {
       const reply = await askVillageAssistant(q, snapshot, events, villageChatHistory(msgs))
-      setMsgs((m) => [...m, { role: 'bot', text: reply.text }])
-      if (viaVoice || voiceReply) speak(reply.text)
+      const clean = cleanReply(reply.text)
+      setMsgs((m) => [...m, { role: 'bot', text: clean }])
+      if (viaVoice || voiceReply) speak(clean)
     } catch {
-      const fallback = answer(q, events)
+      const fallback = cleanReply(answer(q, events))
       setMsgs((m) => [...m, { role: 'bot', text: fallback }])
       if (viaVoice || voiceReply) speak(fallback)
     } finally { setPending(false) }

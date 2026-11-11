@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { answer, SUGGESTIONS, villageChatHistory, type ChatMsg } from '../lib/assistant'
+import { FI_LABEL, FRTUS, frtuViews } from '../lib/frtu'
+import { STATUS_LABEL } from '../lib/village'
 import { useVillageEvents } from '../lib/villageEvents'
 import { useVillage } from '../lib/village'
 import { askVillageAssistant } from '../api/villageAssistant'
@@ -22,6 +24,37 @@ function speak(text: string) {
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'ko-KR'
   window.speechSynthesis.speak(u)
+}
+
+function cleanReply(text: string) {
+  return text
+    .replace(/(?:\s*[·/ ]\s*)?가로등과 인입은 측정하지 않았으므로 판정 대상이 아닙니다\.?/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function includeFrtuStatus(question: string, text: string, snapshot: ReturnType<typeof useVillage>) {
+  if (!/(frtu|분기|전압|전류|상태|현황|문제|이상|고장)/i.test(question)) return text
+  const views = frtuViews(snapshot)
+  const alreadyHasFrtuDetails = FRTUS.every(({ id, name }) => {
+    const position = text.indexOf(name)
+    if (position < 0) return false
+    const detail = text.slice(position, position + 180)
+    return views[id].available
+      ? /\d+(?:\.\d+)?\s*V\b/.test(detail) &&
+        /\d+(?:\.\d+)?\s*mA\b/.test(detail) &&
+        (detail.includes(STATUS_LABEL[views[id].status]) || detail.includes(FI_LABEL[views[id].fi]))
+      : /측정 불가|계측값 없음|미측정/.test(detail)
+  })
+  if (alreadyHasFrtuDetails) return text
+  const lines = FRTUS.map(({ id, name }) => {
+    const value = views[id]
+    return value.available
+      ? `${name}: ${STATUS_LABEL[value.status]} · FI ${FI_LABEL[value.fi]} · ${value.v.toFixed(2)} V · 측정 ${(value.i * 1000).toFixed(1)} mA · 예상 ${(value.expected * 1000).toFixed(1)} mA`
+      : `${name}: 계측값 없음`
+  })
+  return `${text}\n\nFRTU 현황\n${lines.join('\n')}`.trim()
 }
 
 /** FRTU(마을 모형) 상태 조회 도우미: 글이나 음성으로 묻고 값을 듣는다. 장치는 조작하지 않음 */
@@ -54,16 +87,12 @@ export default function VillageStatusChat() {
     setPending(true)
     try {
       const reply = await askVillageAssistant(q, snapshot, events, villageChatHistory(msgs))
-      const badge = reply.mode === 'llm' ? `서버 LLM${reply.model ? ` · ${reply.model}` : ''}` : '서버 규칙 답변'
-      const text = `${reply.text}\n[${badge}]`
-      setMsgs((m) => [...m, { role: 'bot', text }])
-      if (viaVoice || voiceReply) speak(reply.text)
-    } catch (error) {
-      const fallback = answer(q, events)
-      const reason = (error as Error).message || '서버 LLM 연결 실패'
-      const text = `${fallback}\n[브라우저 규칙 답변 · ${reason}]`
-      setMsgs((m) => [...m, { role: 'bot', text }])
-      setMicMsg(`서버 LLM을 사용하지 못해 브라우저 규칙 답변을 표시했어요. ${reason}`)
+      const clean = includeFrtuStatus(q, cleanReply(reply.text), snapshot)
+      setMsgs((m) => [...m, { role: 'bot', text: clean }])
+      if (viaVoice || voiceReply) speak(clean)
+    } catch {
+      const fallback = includeFrtuStatus(q, cleanReply(answer(q, events)), snapshot)
+      setMsgs((m) => [...m, { role: 'bot', text: fallback }])
       if (viaVoice || voiceReply) speak(fallback)
     } finally { setPending(false) }
   }
@@ -103,10 +132,9 @@ export default function VillageStatusChat() {
 
   return (
     <div className="chat">
-      <div className="chat-scope small muted">마을 직류 계측 · {snapshot.source === 'MOCK' ? '시뮬레이터' : '실측 Arduino'} · 서버 LLM 근거 확인</div>
       <div className="chat-log" aria-live="polite">
         {msgs.map((m, k) => <div key={k} className={`chat-msg ${m.role}`}>{m.text}</div>)}
-        {pending && <div className="chat-msg bot" role="status">서버 LLM이 계측·사건 근거를 확인하고 있어요…</div>}
+        {pending && <div className="chat-msg bot" role="status">답변을 준비하고 있어요…</div>}
         {listening && <div className="chat-msg user listening">듣는 중…</div>}
         <div ref={end} />
       </div>

@@ -283,8 +283,8 @@ function DiagnosisReport({ verdict, rule, location, similar, liveNormal, feature
               ))}
             </div>
             <div className="gauges" style={{ marginTop: 10 }}>
-              <Gauge label="1순위 점수" note="충분히 뚜렷한가" value={scored.ranking[0]?.score ?? 0} limit={EVENT_MODEL.thresholds.score} />
-              {scored.ranking[1] && <Gauge label="1·2위 점수 차" note="두 유형을 가를 수 있는가" value={scored.ranking[0].score - scored.ranking[1].score} limit={EVENT_MODEL.thresholds.margin} max={Math.max(0.5, EVENT_MODEL.thresholds.margin * 2)} />}
+              <Gauge label="AI 원인 후보 1위 점수" note="최종 원인으로 표시할 최소 점수" value={scored.ranking[0]?.score ?? 0} limit={EVENT_MODEL.thresholds.score} />
+              {scored.ranking[1] && <Gauge label="AI 1·2위 후보 점수 차" note="두 원인 후보를 구분하는 최소 차이" value={scored.ranking[0].score - scored.ranking[1].score} limit={EVENT_MODEL.thresholds.margin} max={Math.max(0.5, EVENT_MODEL.thresholds.margin * 2)} />}
             </div>
             {scored.kind === 'WITHHELD' && <ul className="small" style={{ marginTop: 6 }}>{scored.reasons.map((r) => <li key={r}>{r}</li>)}</ul>}
             <p className="hint">보정되지 않은 점수예요. 정답일 확률이 아니에요.</p>

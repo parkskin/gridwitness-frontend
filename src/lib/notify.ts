@@ -62,7 +62,7 @@ export function alertIncident(title: string) {
   beep()
   if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification('GridWitness · 고장표시 발생', { body: title, tag: 'gw-incident' })
+      new Notification('GridWitness · 이상 감지', { body: title, tag: 'gw-incident' })
     } catch {
       // 알림을 띄울 수 없는 환경
     }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { getActor } from '../lib/actor'
 import { FRTUS } from '../lib/frtu'
@@ -34,7 +34,6 @@ function useNow(active: boolean) {
 /** 화면에는 안 보이고 계측을 지켜보다 고장표시가 뜨면 사건을 만든다. 3D 마을에서는 사건 화면을 바로 띄움 */
 export function IncidentWatcher() {
   const snap = useVillage()
-  const { pathname } = useLocation()
   const { incidents } = useLiveIncidents()
   // 저장돼 있던 지난 사건은 새 사건으로 치지 않음 (새로고침해도 다시 울리지 않게)
   const seen = useRef(new Set(incidents.map((x) => x.recordId)))
@@ -45,9 +44,8 @@ export function IncidentWatcher() {
     if (!top || seen.current.has(top.recordId)) return
     seen.current.add(top.recordId)
     if (top.startedAt < mountedAt) return
-    alertIncident(top.title)
-    if (pathname === '/village') openIncident(top.recordId)
-  }, [incidents, pathname, mountedAt])
+    alertIncident(alertTitleFor(top))
+  }, [incidents, mountedAt])
   // 사건 기록 자동 등록: 이 화면을 연 뒤 생긴 사건은 사람이 누르지 않아도 사건 기록으로 넘김.
   // 이상 전후 계측이 기록에 담기도록 복구되거나 15초가 지난 뒤 한 번만 등록 (같은 사건은 다시 등록하지 않음)
   const tried = useRef(new Map<string, number>())
@@ -84,15 +82,26 @@ export function IncidentBanner() {
   if (!top || openId === top.recordId || dismissed.includes(top.recordId)) return null
   if (top.clearedAt && now - top.clearedAt > 60_000) return null
   const live = !top.clearedAt
+  const alertTitle = alertTitleFor(top)
   return (
     <div className={`incident-banner ${live ? 'live' : 'ok'} no-print`} role="alert">
       <span className="ib-dot" />
-      <strong>{live ? top.title : `복구됨 · ${secs(top.clearedAt! - top.startedAt)} 만에`}</strong>
-      <span className="ib-time">{live ? `${secs(now - top.startedAt)} 전 발생` : top.title}</span>
-      <button type="button" className="btn btn-sm" onClick={() => openIncident(top.recordId)}>보기</button>
+      <strong>{live ? alertTitle : '전력 설비 복구'}</strong>
+      <span className="ib-time">{live ? `${secs(now - top.startedAt)} 전 감지` : `${secs(top.clearedAt! - top.startedAt)} 만에 복구`}</span>
+      <button type="button" className="btn btn-sm" onClick={() => openIncident(top.recordId)}>상세 보기</button>
       <button type="button" className="ib-x" onClick={() => dismissIncident(top.recordId)} aria-label="알림 닫기"><IconX /></button>
     </div>
   )
+}
+
+function alertTitleFor(incident: LiveIncident) {
+  return ({
+    HOUSE: '주택 분기 이상 감지',
+    LAMP: '가로등 분기 이상 감지',
+    BOTH: '복수 분기 이상 감지',
+    UPSTREAM: '전원 계통 이상 감지',
+    UNKNOWN: '이상 감지 · 분기 계측 확인 필요',
+  } as Partial<Record<LiveIncident['scope'], string>>)[incident.scope] ?? '전력 설비 이상 감지'
 }
 
 /** 처리 단계(접수 → 출동 → 점검 → 복구 → 종결)와 담당자. 담당자가 직접 단계를 넘긴다 */
